@@ -44,12 +44,40 @@ type AuthResponse struct {
 	} `json:"user,omitempty"`
 }
 
+type SignupRequest struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func main() {
 	mux := http.NewServeMux()
 
 	// Health check
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "MeetMint Backend is running")
+	})
+
+	// Mock Signup Endpoint
+	mux.HandleFunc("/api/signup", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req SignupRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		resp := AuthResponse{
+			Message: "Registration successful! (Mock)",
+		}
+		resp.User.Email = req.Email
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	})
 
 	// Mock Login Endpoint

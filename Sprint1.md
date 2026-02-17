@@ -32,7 +32,9 @@ The following user stories were addressed in Sprint 1:
 ### Backend (Go)
 - [x] **Project Setup**: Initialize Go module and high-performance HTTP server.
 - [x] **API: Video Upload**: Endpoint `/api/upload-video` handling multipart uploads and returning prioritized meeting notes.
+- [x] **API: Login**: Mock endpoints `/api/login` and `/api/verify-otp` for user authentication.
 - [x] **API: Intelligent Summary**: Endpoint `/api/summary` returning structured JSON with summaries, decisions, and action items.
+- [x] **API: Signup**: Mock endpoint `/api/signup` for user registration.
 - [x] **API: RAG Q&A**: Endpoint `/api/ask` processing meeting context to provide cited answers.
 - [x] **CORS Configuration**: Secure communication between Frontend (Vite) and Backend (Go).
 
