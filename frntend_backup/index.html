@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>MeetMint - Sprint 1</title>
   <style>
@@ -8,11 +9,15 @@
       background: #f4f6f8;
       padding: 30px;
     }
-    textarea, input, button {
+
+    textarea,
+    input,
+    button {
       width: 100%;
       padding: 10px;
       margin-top: 10px;
     }
+
     .box {
       background: white;
       padding: 20px;
@@ -21,44 +26,45 @@
     }
   </style>
 </head>
+
 <body>
 
-<h1>MeetMint</h1>
-<p><b>Post-meeting productivity tool</b></p>
+  <h1>MeetMint</h1>
+  <p><b>Post-meeting productivity tool</b></p>
 
-<div class="box">
-  <h3>Paste Meeting Notes (After Meeting Ends)</h3>
-  <textarea id="notes" rows="6">
+  <div class="box">
+    <h3>Paste Meeting Notes (After Meeting Ends)</h3>
+    <textarea id="notes" rows="6">
 We discussed sprint planning.
 Alice said she will build the UI by Friday.
 Bob will work on backend APIs.
   </textarea>
 
-  <button onclick="generateSummary()">Generate Summary</button>
-</div>
+    <button onclick="generateSummary()">Generate Summary</button>
+  </div>
 
-<div class="box" id="summaryBox"></div>
+  <div class="box" id="summaryBox"></div>
 
-<div class="box">
-  <h3>Ask Meeting Context (RAG)</h3>
-  <input id="question" placeholder="Who owns the UI task?" />
-  <button onclick="askQuestion()">Ask</button>
-  <p id="ragAnswer"></p>
-</div>
+  <div class="box">
+    <h3>Ask Meeting Context (RAG)</h3>
+    <input id="question" placeholder="Who owns the UI task?" />
+    <button onclick="askQuestion()">Ask</button>
+    <p id="ragAnswer"></p>
+  </div>
 
-<script>
-async function generateSummary() {
-  const notes = document.getElementById("notes").value;
+  <script>
+    async function generateSummary() {
+      const notes = document.getElementById("notes").value;
 
-  const response = await fetch("http://localhost:5000/api/summary", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ notes })
-  });
+      const response = await fetch("http://localhost:5000/api/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes })
+      });
 
-  const data = await response.json();
+      const data = await response.json();
 
-  document.getElementById("summaryBox").innerHTML = `
+      document.getElementById("summaryBox").innerHTML = `
     <h3>Summary</h3>
     <p>${data.summary}</p>
 
@@ -72,22 +78,23 @@ async function generateSummary() {
       ).join("")}
     </ul>
   `;
-}
+    }
 
-async function askQuestion() {
-  const question = document.getElementById("question").value;
+    async function askQuestion() {
+      const question = document.getElementById("question").value;
 
-  const response = await fetch("http://localhost:5000/api/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question })
-  });
+      const response = await fetch("http://localhost:5000/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
 
-  const data = await response.json();
-  document.getElementById("ragAnswer").innerText =
-    `${data.answer} (${data.citation})`;
-}
-</script>
+      const data = await response.json();
+      document.getElementById("ragAnswer").innerText =
+        `${data.answer} (${data.citation})`;
+    }
+  </script>
 
 </body>
+
 </html>

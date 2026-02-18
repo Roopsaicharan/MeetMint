@@ -211,7 +211,7 @@ func main() {
 		json.NewEncoder(w).Encode(resp)
 	})
 
-	// CORS Setup
+	// CORS Setup for secure communication betwwen frontend and backend.
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"}, // Allow Vite default port
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
