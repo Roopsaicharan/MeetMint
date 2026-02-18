@@ -41,13 +41,4 @@ The following user stories were addressed in Sprint 1:
 ## Incomplete Issues
 - **None**: All targeted functionalities for the Sprint 1 Mock/Prototype were successfully implemented and polished.
 
----
 
-### Demo Requirements
-1. **Integrated Frontend/Backend Flow**:
-   - Demonstrate authentication and dashboard navigation.
-   - Show the end-to-end "Video Upload -> AI Analysis -> Status Tracking" workflow.
-   - Highlight the dynamic progress tracking and member counts.
-2. **Technical Verification**:
-   - Run the Go backend and demonstrate JSON responses via Postman/cURL.
-   - Verify dynamic UI updates when changing task statuses.
