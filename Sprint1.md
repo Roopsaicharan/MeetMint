@@ -43,11 +43,6 @@ The following user stories were addressed in Sprint 1:
 
 ---
 
-## Submission Details
-
-### GitHub Repository
-[Insert your GitHub Link Here] - *Please ensure all code is pushed to the main branch.*
-
 ### Demo Requirements
 1. **Integrated Frontend/Backend Flow**:
    - Demonstrate authentication and dashboard navigation.
