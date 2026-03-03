@@ -13,9 +13,7 @@ function App() {
     setPage('dashboard')
   }
 
-  const handleRegister = () => {
-    setPage('login')
-  }
+  const handleRegister = () => setPage('login')
 
   const handleLogout = () => {
     setUser(null)
@@ -24,14 +22,14 @@ function App() {
 
   return (
     <div className="app-alive-container">
-      {/* Dynamic Background Elements */}
-      <div className="alive-bg-base"></div>
-      <div className="alive-orb orb-1"></div>
-      <div className="alive-orb orb-2"></div>
-      <div className="alive-orb orb-3"></div>
-      <div className="alive-noise"></div>
+      {/* global animated background */}
+      <div className="alive-bg-base" />
+      <div className="alive-orb orb-1" />
+      <div className="alive-orb orb-2" />
+      <div className="alive-orb orb-3" />
+      <div className="alive-noise" />
 
-      {/* Main Content */}
+      {/* app content */}
       <div className="app-content">
         {page === 'login' && (
           <LoginPage
@@ -47,9 +45,7 @@ function App() {
           />
         )}
 
-        {page === 'dashboard' && (
-          <Dashboard user={user} onLogout={handleLogout} />
-        )}
+        {page === 'dashboard' && <Dashboard user={user} onLogout={handleLogout} />}
       </div>
     </div>
   )
