@@ -8,7 +8,7 @@ function Dashboard({ user, onLogout }) {
   const [activeProject, setActiveProject] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Project Data State with Dummy Data
+ // Project Data State with Dummy Data
   const [projects, setProjects] = useState([
     {
       id: 1,
