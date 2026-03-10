@@ -7,5 +7,5 @@ MeetMint is a full-stack web application that converts meeting notes or transcri
 - **Member 1 (Front-End Engineer):** [Jayanth Reddy Thadi]
 - **Member 2 (Front-End Engineer):** [Asmitha Ramesh]
 - **Member 3 (Back-End Engineer):** [Roop Sai Charan Kothamasu]
-- **Member 4 (Back-End Engineer):** [Sai Narasimha Chowdary Yalamanchili]
+- **Member 4 (Back-End Engineer):** [Sai Narasimha Chowdary Yalamanchili] 
 
