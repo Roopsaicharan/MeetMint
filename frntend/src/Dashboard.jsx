@@ -123,7 +123,7 @@ function Dashboard({ user, onLogout }) {
     formData.append('video', videoFile)
 
     try {
-      // Upload video
+      // upload video
       const response = await fetch('http://localhost:5000/api/upload-video', {
         method: 'POST',
         body: formData
