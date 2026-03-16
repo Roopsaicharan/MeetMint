@@ -7,7 +7,7 @@ function LoginPage({ onLogin, onGoToRegister }) {
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState("email"); // 'email' | 'otp'
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); 
   const [loading, setLoading] = useState(false);
 
   const handleSendOTP = (e) => {
