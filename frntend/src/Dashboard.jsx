@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import MMLogo from './MMLogo'
+import ProjectTabs from './ProjectTabs'
 import './index.css'
 
 function Dashboard({ user, onLogout }) {
@@ -8,7 +9,7 @@ function Dashboard({ user, onLogout }) {
   const [activeProject, setActiveProject] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
 
- // Project Data State with Dummy Data
+  // Project Data State with Dummy Data
   const [projects, setProjects] = useState([
     {
       id: 1,
@@ -27,10 +28,30 @@ function Dashboard({ user, onLogout }) {
           'Backend Go server to handle dynamic status updates'
         ],
         action_items: [
-          { title: 'Implement Glass UI components', owner: 'Jayanth', due: 'Friday', status: 'done' },
-          { title: 'Refactor Dashboard for horizontal layout', owner: 'Ashmitha', due: 'Saturday', status: 'inprogress' },
-          { title: 'Setup Go API for task tracking', owner: 'ROOP', due: 'Thursday', status: 'todo' },
-          { title: 'Integrate CORS and RAG logic', owner: 'NARASIMHA', due: 'Friday', status: 'todo' }
+          {
+            title: 'Implement Glass UI components',
+            owner: 'Jayanth',
+            due: 'Friday',
+            status: 'done'
+          },
+          {
+            title: 'Refactor Dashboard for horizontal layout',
+            owner: 'Ashmitha',
+            due: 'Saturday',
+            status: 'inprogress'
+          },
+          {
+            title: 'Setup Go API for task tracking',
+            owner: 'ROOP',
+            due: 'Thursday',
+            status: 'todo'
+          },
+          {
+            title: 'Integrate CORS and RAG logic',
+            owner: 'NARASIMHA',
+            due: 'Friday',
+            status: 'todo'
+          }
         ]
       }
     },
@@ -60,6 +81,22 @@ function Dashboard({ user, onLogout }) {
   const [answer, setAnswer] = useState(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [loadingAnswer, setLoadingAnswer] = useState(false)
+
+  // Chat / Right panel tabs
+  const [rightTab, setRightTab] = useState('summary')
+  const [chatInput, setChatInput] = useState('')
+  const [projectChats, setProjectChats] = useState({
+    1: [
+      {
+        id: 1,
+        sender: 'Ashmitha',
+        senderEmail: 'ashmitha@example.com',
+        text: 'Let’s finalize the dashboard UI first.',
+        time: '10:20 AM'
+      }
+    ],
+    2: []
+  })
 
   // Selection Mode State
   const [selectionMode, setSelectionMode] = useState(false)
@@ -91,11 +128,13 @@ function Dashboard({ user, onLogout }) {
 
   const toggleProjectSelection = (id) => {
     const newSelection = new Set(selectedProjects)
+
     if (newSelection.has(id)) {
       newSelection.delete(id)
     } else {
       newSelection.add(id)
     }
+
     setSelectedProjects(newSelection)
   }
 
@@ -156,6 +195,12 @@ function Dashboard({ user, onLogout }) {
       setSummary(null)
       setAnswer(null)
       setView('project')
+      setRightTab('summary')
+      setChatInput('')
+      setProjectChats((prev) => ({
+        ...prev,
+        [newProject.id]: []
+      }))
 
       // Reset form
       setNewProjectName('')
@@ -163,7 +208,7 @@ function Dashboard({ user, onLogout }) {
       setVideoFile(null)
     } catch (error) {
       console.error('Error creating project:', error)
-      alert('Failed to create project. Is the backend running?')
+      alert('Failed to create project.\nIs the backend running?')
     } finally {
       setLoadingVideo(false)
     }
@@ -174,25 +219,62 @@ function Dashboard({ user, onLogout }) {
     setNotes(project.notes || '')
     setSummary(project.summary)
     setAnswer(null)
+    setRightTab('summary')
+    setChatInput('')
     setView('project')
   }
 
+  const handleSendMessage = () => {
+    if (!chatInput.trim() || !activeProject) return
+
+    const senderEmail = user?.email || 'you@meetmint.app'
+    const senderName = senderEmail.split('@')[0]
+
+    const newMessage = {
+      id: Date.now(),
+      sender: senderName,
+      senderEmail,
+      text: chatInput.trim(),
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    setProjectChats((prev) => ({
+      ...prev,
+      [activeProject.id]: [...(prev[activeProject.id] || []), newMessage]
+    }))
+
+    setChatInput('')
+  }
+
   const calculateProjectProgress = (summaryData) => {
-    if (!summaryData || !summaryData.action_items || summaryData.action_items.length === 0) return 0
+    if (!summaryData || !summaryData.action_items || summaryData.action_items.length === 0) {
+      return 0
+    }
+
     const total = summaryData.action_items.length
     const completed = summaryData.action_items.filter((item) => item.status === 'done').length
     return Math.round((completed / total) * 100)
   }
 
   const calculateProjectMembers = (summaryData) => {
-    if (!summaryData || !summaryData.action_items || summaryData.action_items.length === 0) return 1
+    if (!summaryData || !summaryData.action_items || summaryData.action_items.length === 0) {
+      return 1
+    }
+
     const owners = new Set(summaryData.action_items.map((item) => item.owner))
     return owners.size
   }
 
   const getProjectStatusTerm = (project) => {
-    if (!project.summary || !project.summary.action_items || project.summary.action_items.length === 0) return 'TODO'
+    if (!project.summary || !project.summary.action_items || project.summary.action_items.length === 0) {
+      return 'TODO'
+    }
+
     const items = project.summary.action_items
+
     if (items.some((i) => i.status === 'blocked')) return 'BLOCKED'
     if (project.progress === 100) return 'DONE'
     if (project.progress > 0) return 'IN PROGRESS'
@@ -206,15 +288,25 @@ function Dashboard({ user, onLogout }) {
       index === taskId ? { ...item, status: newStatus } : item
     )
 
-    const updatedSummary = { ...summary, action_items: updatedActionItems }
+    const updatedSummary = {
+      ...summary,
+      action_items: updatedActionItems
+    }
+
     const newProgress = calculateProjectProgress(updatedSummary)
     const newMembers = calculateProjectMembers(updatedSummary)
 
     setSummary(updatedSummary)
+
     setProjects(
       projects.map((p) =>
         p.id === activeProject.id
-          ? { ...p, summary: updatedSummary, progress: newProgress, members: newMembers }
+          ? {
+              ...p,
+              summary: updatedSummary,
+              progress: newProgress,
+              members: newMembers
+            }
           : p
       )
     )
@@ -226,19 +318,25 @@ function Dashboard({ user, onLogout }) {
 
   const generateSummary = async () => {
     if (!notes) return
+
     setLoadingSummary(true)
+
     try {
       const response = await fetch('http://localhost:5000/api/summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes })
       })
+
       const data = await response.json()
 
       // Add default 'todo' status to all new action items
       const dataWithStatus = {
         ...data,
-        action_items: data.action_items.map((item) => ({ ...item, status: 'todo' }))
+        action_items: data.action_items.map((item) => ({
+          ...item,
+          status: 'todo'
+        }))
       }
 
       setSummary(dataWithStatus)
@@ -249,13 +347,18 @@ function Dashboard({ user, onLogout }) {
       setProjects(
         projects.map((p) =>
           p.id === activeProject.id
-            ? { ...p, summary: dataWithStatus, progress: newProgress, members: newMembers }
+            ? {
+                ...p,
+                summary: dataWithStatus,
+                progress: newProgress,
+                members: newMembers
+              }
             : p
         )
       )
     } catch (error) {
       console.error('Error generating summary:', error)
-      alert('Failed to generate summary. Is the backend running?')
+      alert('Failed to generate summary.\nIs the backend running?')
     } finally {
       setLoadingSummary(false)
     }
@@ -263,18 +366,21 @@ function Dashboard({ user, onLogout }) {
 
   const askQuestion = async () => {
     if (!question) return
+
     setLoadingAnswer(true)
+
     try {
       const response = await fetch('http://localhost:5000/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question })
       })
+
       const data = await response.json()
       setAnswer(data)
     } catch (error) {
       console.error('Error asking question:', error)
-      alert('Failed to get answer. Is the backend running?')
+      alert('Failed to get answer.\nIs the backend running?')
     } finally {
       setLoadingAnswer(false)
     }
@@ -296,6 +402,7 @@ function Dashboard({ user, onLogout }) {
                 </div>
                 <p className="dash-subtitle">Create a new Project</p>
               </div>
+
               <div className="dash-user">
                 <span className="dash-email">{user?.email}</span>
                 <button className="glass-btn-secondary" onClick={() => setView('home')}>
@@ -305,51 +412,57 @@ function Dashboard({ user, onLogout }) {
             </div>
           </header>
 
-          <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '3rem 2rem' }}>
-            <section className="glass-section">
-              <div className="section-header">
-                <h3>Start New Project</h3>
-              </div>
+          <main style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 2rem' }}>
+            <section className="glass-section fade-in">
+              <h3>Start New Project</h3>
 
-              <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                <label className="glass-label">Project Name</label>
-                <input
-                  type="text"
-                  className="glass-text-input"
-                  placeholder="e.g. Sprint 2 Review"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                />
-              </div>
-
-              <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                <label className="glass-label">Due Date (for tracking)</label>
-                <input
-                  type="date"
-                  className="glass-text-input"
-                  value={newProjectDate}
-                  onChange={(e) => setNewProjectDate(e.target.value)}
-                />
-              </div>
-
-              <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                <label className="glass-label">Upload Meeting Video</label>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoChange}
-                  className="dash-file-input"
-                />
-              </div>
-
-              <button
-                onClick={handleCreateProject}
-                disabled={loadingVideo || !videoFile || !newProjectName || !newProjectDate}
-                className="glass-btn-action"
-                style={{ width: '100%' }}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr',
+                  gap: '1rem',
+                  marginTop: '1.5rem'
+                }}
               >
-                {loadingVideo ? 'Processing & Analyzing...' : 'Create Project'}
-              </button>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Project Name</label>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="glass-text-input"
+                    placeholder="Enter project name"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                    Due Date (for tracking)
+                  </label>
+                  <input
+                    type="date"
+                    value={newProjectDate}
+                    onChange={(e) => setNewProjectDate(e.target.value)}
+                    className="glass-text-input"
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                    Upload Meeting Video
+                  </label>
+                  <input type="file" accept="video/*" onChange={handleVideoChange} />
+                </div>
+
+                <button
+                  onClick={handleCreateProject}
+                  disabled={loadingVideo}
+                  className="glass-btn-action"
+                  style={{ marginTop: '1rem' }}
+                >
+                  {loadingVideo ? 'Processing & Analyzing...' : 'Create Project'}
+                </button>
+              </div>
             </section>
           </main>
         </div>
@@ -365,7 +478,7 @@ function Dashboard({ user, onLogout }) {
           <header className="dash-header dash-topbar">
             <div className="header-content">
               <div className="logo-section">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div className="brand-header">
                   <button
                     onClick={() => setView('home')}
                     className="glass-btn-secondary"
@@ -373,17 +486,17 @@ function Dashboard({ user, onLogout }) {
                   >
                     ← Back
                   </button>
-                  <div className="brand-header">
-                    <MMLogo className="header-logo" />
-                    <h1 className="dash-logo" onClick={() => setView('home')} style={{ margin: 0 }}>
-                      MeetMint
-                    </h1>
-                  </div>
+
+                  <h1 className="dash-logo" onClick={() => setView('home')} style={{ margin: 0 }}>
+                    MeetMint
+                  </h1>
                 </div>
+
                 <p className="dash-subtitle">
-                  Project: <strong>{activeProject.name}</strong> ({activeProject.daysLeft} days left)
+                  Project: {activeProject.name} ({activeProject.daysLeft} days left)
                 </p>
               </div>
+
               <div className="dash-user">
                 <span className="dash-email">{user?.email}</span>
                 <button className="dash-logout" onClick={onLogout}>
@@ -393,15 +506,16 @@ function Dashboard({ user, onLogout }) {
             </div>
           </header>
 
-          <main style={{ maxWidth: '1600px', margin: '0 auto', padding: '2rem' }}>
-            <div className="details-side-layout">
+          <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+            <div className="details-grid">
               {/* Left Side: Notes & rag */}
               <div className="details-left">
-                <section className="glass-section">
+                <section className="glass-section fade-in">
                   <div className="section-header">
                     <h3>Meeting Notes</h3>
                     <span className="glass-badge">Review</span>
                   </div>
+
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -409,11 +523,12 @@ function Dashboard({ user, onLogout }) {
                     className="glass-textarea"
                     placeholder="Notes will appear here..."
                   />
+
                   <button
                     onClick={generateSummary}
                     disabled={loadingSummary || !notes}
                     className="glass-btn-secondary"
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', marginTop: '1rem' }}
                   >
                     {loadingSummary ? 'Generating Summary...' : 'Generate Summary'}
                   </button>
@@ -421,6 +536,7 @@ function Dashboard({ user, onLogout }) {
 
                 <section className="glass-section">
                   <h3>Ask Meeting Context (rag)</h3>
+
                   <div className="dash-input-row" style={{ marginTop: '1rem' }}>
                     <input
                       type="text"
@@ -428,7 +544,7 @@ function Dashboard({ user, onLogout }) {
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
                       className="glass-text-input"
-                      onKeyPress={(e) => e.key === 'Enter' && askQuestion()}
+                      onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
                     />
                     <button
                       onClick={askQuestion}
@@ -438,6 +554,7 @@ function Dashboard({ user, onLogout }) {
                       {loadingAnswer ? 'Asking...' : 'Ask'}
                     </button>
                   </div>
+
                   {answer && (
                     <div className="glass-answer fade-in" style={{ marginTop: '1.5rem' }}>
                       <p className="glass-answer-text">{answer.answer}</p>
@@ -447,87 +564,20 @@ function Dashboard({ user, onLogout }) {
                 </section>
               </div>
 
-              {/* Right Side: Summary Results */}
+              {/* Right Side: Summary / Tasks / Chat */}
               <div className="details-right">
-                {summary || activeProject.summary ? (
-                  <section className="glass-section glass-result fade-in" style={{ height: '100%' }}>
-                    <div className="section-header">
-                      <h3>AI Insight Summary</h3>
-                      <span
-                        className="glass-badge"
-                        style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}
-                      >
-                        Complete
-                      </span>
-                    </div>
-                    <p className="glass-summary-text">
-                      {(summary ? summary.summary : activeProject.summary.summary) || ''}
-                    </p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
-                      <div>
-                        <h4>Key Decisions</h4>
-                        <ul className="glass-list">
-                          {(summary ? summary.decisions : activeProject.summary.decisions).map((d, i) => (
-                            <li key={i}>{d}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h4>Action Items</h4>
-                        <ul className="glass-task-list">
-                          {(summary ? summary.action_items : activeProject.summary.action_items).map((t, i) => (
-                            <li key={i} className="glass-task-item">
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                <div>
-                                  <span className="glass-task-title">{t.title}</span>
-                                  <div className="glass-task-meta">
-                                    <span>👤 {t.owner}</span>
-                                    <span>📅 {t.due}</span>
-                                  </div>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                                  <span className={`task-status-badge ${t.status || 'todo'}`}>
-                                    {(t.status || 'todo').toUpperCase()}
-                                  </span>
-                                  <select
-                                    className="task-status-select"
-                                    value={t.status || 'todo'}
-                                    onChange={(e) => updateTaskStatus(i, e.target.value)}
-                                  >
-                                    <option value="todo">To Do</option>
-                                    <option value="inprogress">In Progress</option>
-                                    <option value="blocked">Blocked</option>
-                                    <option value="done">Done</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </section>
-                ) : (
-                  <div
-                    className="glass-section"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      height: '100%',
-                      minHeight: '400px',
-                      opacity: 0.6
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✨</div>
-                      <p>Generate a summary to see AI insights</p>
-                    </div>
-                  </div>
-                )}
+                <ProjectTabs
+                  rightTab={rightTab}
+                  setRightTab={setRightTab}
+                  summaryData={summary || activeProject.summary}
+                  activeProject={activeProject}
+                  updateTaskStatus={updateTaskStatus}
+                  projectMessages={projectChats[activeProject.id] || []}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  onSendMessage={handleSendMessage}
+                  currentUserEmail={user?.email || ''}
+                />
               </div>
             </div>
           </main>
@@ -561,7 +611,9 @@ function Dashboard({ user, onLogout }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+
               <span className="dash-email">{user?.email}</span>
+
               <button className="dash-logout" onClick={onLogout}>
                 Sign Out
               </button>
@@ -577,7 +629,9 @@ function Dashboard({ user, onLogout }) {
               {selectionMode ? (
                 <>
                   <button className="glass-btn-secondary" onClick={handleSelectAll}>
-                    {selectedProjects.size === filteredProjects.length ? 'Deselect All' : 'Select All'}
+                    {selectedProjects.size === filteredProjects.length
+                      ? 'Deselect All'
+                      : 'Select All'}
                   </button>
 
                   <button
@@ -595,9 +649,14 @@ function Dashboard({ user, onLogout }) {
                 </>
               ) : (
                 <>
-                  <button className="icon-btn" onClick={toggleSelectionMode} title="Batch Delete">
+                  <button
+                    className="icon-btn"
+                    onClick={toggleSelectionMode}
+                    title="Batch Delete"
+                  >
                     🗑️
                   </button>
+
                   <button className="glass-btn-action" onClick={() => setView('create')}>
                     + New Project
                   </button>
@@ -617,7 +676,9 @@ function Dashboard({ user, onLogout }) {
                 <div
                   key={project.id}
                   className={`project-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => (selectionMode ? toggleProjectSelection(project.id) : openProject(project))}
+                  onClick={() =>
+                    selectionMode ? toggleProjectSelection(project.id) : openProject(project)
+                  }
                   style={{
                     border: isSelected ? '2px solid #60a5fa' : '',
                     transform: isSelected ? 'translateY(-5px)' : ''
@@ -645,35 +706,42 @@ function Dashboard({ user, onLogout }) {
 
                   <div className="project-meta">
                     <div className="meta-item">
-                      <span className="meta-icon">📅</span>
+                      <span className="meta-icon"></span>
                       <span>Due: {project.dueDate}</span>
                     </div>
+
                     <div className="meta-item">
-                      <span className="meta-icon">👥</span>
+                      <span className="meta-icon"></span>
                       <span>{project.members || 1} Members</span>
                     </div>
                   </div>
 
-                  {/* status pill upgrade hook */}
-                  <span className={`status-badge ${isActive ? 'active' : 'review'} status-pill ${isActive ? 'is-active' : ''}`}>
+                  <span
+                    className={`status-badge ${isActive ? 'active' : 'review'} status-pill ${
+                      isActive ? 'is-active' : ''
+                    }`}
+                  >
                     {project.status}
                   </span>
 
                   <div className="progress-section">
                     <div className="progress-label">
                       <span>Project Status</span>
-                      <span className={`task-status-badge ${getProjectStatusTerm(project).toLowerCase().replace(' ', '')}`}>
+                      <span
+                        className={`task-status-badge ${getProjectStatusTerm(project)
+                          .toLowerCase()
+                          .replace(' ', '')}`}
+                      >
                         {getProjectStatusTerm(project)}
                       </span>
                     </div>
 
-                    {/* progress animation hook */}
                     <div className="progress-bar progress-track">
                       <div
                         className="progress-fill"
                         style={{
-                          width: `${progressNum}%`,       // keeps your existing look
-                          '--p': progressScale            // enables smooth grow animation
+                          width: `${progressNum}%`,
+                          '--p': progressScale
                         }}
                       />
                     </div>
