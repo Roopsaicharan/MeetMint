@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,7 +14,7 @@ import (
 	"github.com/rs/cors"
 )
 
-//Data structs        
+// Data structs
 type SummaryResponse struct {
 	Summary     string       `json:"summary"`
 	Decisions   []string     `json:"decisions"`
@@ -510,9 +509,9 @@ func main() {
 			for i, item := range resp.ActionItems {
 				// Try to find user by name (mocked AI returns names)
 				var ownerID *string
-				err := DB.QueryRow(context.Background(),
-					"SELECT id FROM users WHERE name ILIKE $1 OR email ILIKE $1 LIMIT 1",
-					item.Owner,
+				err := DB.QueryRow(
+					"SELECT id FROM users WHERE name LIKE '%' || ? || '%' OR email LIKE '%' || ? || '%' LIMIT 1",
+					item.Owner, item.Owner,
 				).Scan(&ownerID)
 
 				// Fallback: If AI assigned to someone not in DB, assign to meeting creator
@@ -822,8 +821,8 @@ func main() {
 		}
 
 		// Update Status
-		_, err = DB.Exec(context.Background(),
-			"UPDATE tasks SET status = $1 WHERE id = $2",
+		_, err = DB.Exec(
+			"UPDATE tasks SET status = ? WHERE id = ?",
 			req.Status, req.TaskID,
 		)
 		if err != nil {

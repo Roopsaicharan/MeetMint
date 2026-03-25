@@ -1,38 +1,44 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "modernc.org/sqlite"
 )
 
 // DB is the global database connection pool.
-var DB *pgxpool.Pool
+var DB *sql.DB
 
-// InitDB initializes the PostgreSQL connection pool using DATABASE_URL from env.
+// InitDB initializes the SQLite database.
 func InitDB() {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL environment variable is not set")
+	dbPath := os.Getenv("DATABASE_URL")
+	if dbPath == "" {
+		dbPath = "meetmint.db" // Default fallback
 	}
 
 	var err error
-	DB, err = pgxpool.New(context.Background(), dbURL)
+	DB, err = sql.Open("sqlite", dbPath)
 	if err != nil {
-		log.Fatalf("Unable to create connection pool: %v\n", err)
+		log.Fatalf("Unable to open database: %v\n", err)
 	}
 
 	// Verify the connection
-	if err := DB.Ping(context.Background()); err != nil {
+	if err := DB.Ping(); err != nil {
 		log.Fatalf("Unable to ping database: %v\n", err)
 	}
 
+	// Enable foreign keys
+	_, err = DB.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		log.Printf("Warning: Failed to enable foreign keys: %v\n", err)
+	}
+
 	fmt.Println("--------------------------------------------------")
-	fmt.Println("🚀 DATABASE SCHEMA INITIALIZATION STARTING")
+	fmt.Println("🚀 DATABASE SCHEMA INITIALIZATION STARTING (SQLite)")
 	fmt.Println("--------------------------------------------------")
 
 	// Auto-initialize schema if tables are missing
@@ -47,21 +53,19 @@ func InitDB() {
 			if trimmed == "" {
 				continue
 			}
-			_, err = DB.Exec(context.Background(), trimmed)
+			_, err = DB.Exec(trimmed)
 			if err != nil {
-				// Don't fail the whole process if one statement fails (e.g. extension already exists)
-				log.Printf("⚠️  SCHEMA NOTE: Statement failed (may already exist): %v\n", err)
+				log.Printf("⚠️  SCHEMA NOTE: Statement failed: %v\n", err)
 			} else {
-				// Log success for specific tables we care about to be sure
 				if strings.Contains(strings.ToLower(trimmed), "pending_signups") {
 					fmt.Println("✅ TABLE CHECKED/CREATED: pending_signups")
 				}
 			}
 		}
-		// 2. Extra Migrations: Ensure existing tables have the latest columns
-		// PostgreSQL 'IF NOT EXISTS' only works for creation, not columns.
-		_, _ = DB.Exec(context.Background(), "ALTER TABLE meetings ADD COLUMN IF NOT EXISTS summary_text TEXT;")
-		_, _ = DB.Exec(context.Background(), "ALTER TABLE meetings ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE CASCADE;")
+
+		// Extra Migrations (SQLite style - column exists check is different, but we'll try simple ALTERs)
+		_, _ = DB.Exec("ALTER TABLE meetings ADD COLUMN summary_text TEXT;") // Will fail if already exists, which is fine
+		_, _ = DB.Exec("ALTER TABLE meetings ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE CASCADE;")
 
 		fmt.Println("--------------------------------------------------")
 		fmt.Println("🏁 DATABASE SCHEMA INITIALIZATION COMPLETED")
@@ -69,7 +73,7 @@ func InitDB() {
 	}
 }
 
-// CloseDB closes the database connection pool.
+// CloseDB closes the database connection.
 func CloseDB() {
 	if DB != nil {
 		DB.Close()
