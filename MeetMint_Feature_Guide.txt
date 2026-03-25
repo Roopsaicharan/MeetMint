@@ -1,0 +1,75 @@
+================================================================================
+MEETMINT: PROJECT OVERVIEW AND FEATURE DOCUMENTATION
+================================================================================
+
+1. PROJECT SUMMARY
+------------------
+MeetMint is an AI-powered project management and meeting analysis dashboard. 
+It transforms raw meeting data (videos and transcripts) into structured, 
+actionable project hubs, utilizing GenAI for summarization, task extraction, 
+and context-aware Q&A.
+
+2. TECHNICAL STACK
+------------------
+- Frontend: React.js (Vite), Vanilla CSS (Custom Design System)
+- Backend: Go (Golang)
+- Database: SQLite (Persistent Storage)
+- State Management: React Hooks (useState, useEffect, useMemo)
+- Animations: CSS Transitions, Custom RequestAnimationFrame loops
+
+3. CORE FEATURES: AUTHENTICATION
+--------------------------------
+- REGISTRATION: Secure user signup with validated input fields.
+- LOGIN: Protected access with session-based identity management.
+- OTP VERIFICATION: Integrated one-time-password system for secure onboarding.
+- THEMED UI: Auth pages share the project's signature "Vibrant Blue" aesthetic.
+
+4. CORE FEATURES: DASHBOARD HUB
+-------------------------------
+- ACTIVE PROJECTS: A dynamic grid of all current projects.
+- 3D INTERACTIVE CARDS: Projects are displayed as "Ultra-Cards" that tilt and 
+  glow in response to mouse movement for a premium feel.
+- PROGRESS TRACKING: Real-time visual progress bars based on task completion.
+- BATCH DELETION: Efficient project management with multi-select and delete.
+- SUB-VIEW NAVIGATION:
+  * DASHBOARD: The main hub for project management and creation.
+  * MEETINGS: A centralized vault of all analyzed meeting records.
+  * TASKS: A global "to-do" list aggregating action items from all projects.
+  * TEAM: A directory of all team members with live status indicators.
+  * INSIGHTS: Dashboard-level analytics on project health and productivity.
+
+5. CORE FEATURES: PROJECT DETAILS (SUB-VIEW)
+--------------------------------------------
+- AI MEETING NOTES: Automatically generated transcripts and summaries of meeting 
+  discussions, highlighting key decisions and blockers.
+- ACTION ITEMS: A focused task list extracted by AI, allowing manual status 
+  updates (TODO, IN PROGRESS, DONE).
+- MEMBER MANAGEMENT: A professional "pop window" interface for adding and 
+  assigning team members directly within the project context.
+- AI CHAT (RAG): An interactive "AI Q&A" assistant that answers specific 
+  questions about the meeting data, roadmap, owners, or blockers.
+
+6. CORE FEATURES: UI/UX & AESTHETICS
+------------------------------------
+- VIBRANT BLUE THEME: A sophisticated dark-mode design with deep blues and 
+  frosted glass (glassmorphism) effects.
+- CUSTOM CURSOR: A reactive ring-and-dot system with a blue comet trail that 
+  interacts with dashboard elements.
+- MOTION BACKGROUND: A high-fidelity dynamic background with subtle grain, 
+  minimalistic blur, and animated gradients.
+- MICRO-ANIMATIONS: Entrance transitions, button ripples, and header slides 
+  ensure a fluid, responsive user experience.
+
+7. PROJECT WORKFLOW
+-------------------
+1. ONBOARDING: Register and verify your identity via OTP.
+2. CREATION: Start a new project with a name, date, and meeting video file.
+3. ANALYSIS: AI processes the meeting to generate notes and action items.
+4. MANAGEMENT: Track tasks on the Kanban board, assign owners, and manage 
+   the team.
+5. INTERACTION: Use the AI Chat to query project details and the Navigation 
+   tabs to view global status.
+
+================================================================================
+MeetMint - Turning Meetings into Action.
+================================================================================
