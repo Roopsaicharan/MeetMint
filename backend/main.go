@@ -10,7 +10,7 @@ import (
 	"github.com/rs/cors"
 )
 
-//Data Structs        
+//Data structs        
 type SummaryResponse struct {
 	Summary     string       `json:"summary"`
 	Decisions   []string     `json:"decisions"`
