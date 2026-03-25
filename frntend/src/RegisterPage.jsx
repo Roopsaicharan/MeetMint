@@ -169,18 +169,7 @@ function RegisterPage({ onRegister, onGoToLogin }) {
                                 />
                             </div>
 
-                            <div className="glass-input-group">
-                                <label htmlFor="register-email">Email</label>
-                                <input
-                                    id="register-email"
-                                    type="email"
-                                    placeholder="your@email.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    disabled={loading}
-                                    autoComplete="email"
-                                />
-                            </div>
+        {error && <div className="glass-error">{error}</div>}
 
                             <div className="glass-input-group">
                                 <label htmlFor="register-password">Password</label>
@@ -222,8 +211,67 @@ function RegisterPage({ onRegister, onGoToLogin }) {
                     </div>
                 </div>
             </div>
-        </>
-    )
+            <div style={{ opacity: 0.85 }}>Redirecting to sign in…</div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="glass-input-group">
+              <label>Full name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading}
+                autoComplete="name"
+              />
+            </div>
+
+            <div className="glass-input-group">
+              <label>Email</label>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="glass-input-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="glass-input-group">
+              <label>Confirm password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="new-password"
+              />
+            </div>
+
+            <button className="glass-btn" disabled={loading}>
+              {loading ? 'Creating account…' : 'Sign up'}
+            </button>
+
+            <div className="glass-footer">
+              Already have an account?{' '}
+              <button type="button" className="glass-link" onClick={onGoToLogin}>
+                Sign in
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default RegisterPage

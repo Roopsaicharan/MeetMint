@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import MMLogo from './MMLogo'
+import { useState } from "react";
+import MMLogo from "./MMLogo";
+import WavesBackground from "./WavesBackground";
 
 function LoginPage({ onLogin, onGoToRegister }) {
     const [email, setEmail] = useState('')
@@ -11,10 +12,10 @@ function LoginPage({ onLogin, onGoToRegister }) {
     const [message, setMessage] = useState('')
     const [loading, setLoading] = useState(false)
 
-    const handleSendOTP = (e) => {
-        e.preventDefault()
-        setError('')
-        setMessage('')
+  const handleSendOTP = (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
 
         if (!email || !password) {
             setError('Please enter both email and password.')
@@ -115,15 +116,18 @@ function LoginPage({ onLogin, onGoToRegister }) {
             })
     }
 
-    const handleVerifyOTP = (e) => {
-        e.preventDefault()
-        setError('')
-        setMessage('')
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setMessage("Otp sent to your email. (Mock: use 123456)");
+      setStep("otp");
+    }, 800);
+  };
 
-        if (!otp || otp.length !== 6) {
-            setError('Please enter the 6-digit OTP.')
-            return
-        }
+  const handleVerifyOTP = (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
 
         // Real verify — call backend to verify OTP
         setLoading(true)
@@ -151,12 +155,12 @@ function LoginPage({ onLogin, onGoToRegister }) {
             })
     }
 
-    const handleBackToEmail = () => {
-        setStep('email')
-        setOtp('')
-        setError('')
-        setMessage('')
-    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      onLogin({ email });
+    }, 800);
+  };
 
     return (
         <>
@@ -178,23 +182,17 @@ function LoginPage({ onLogin, onGoToRegister }) {
                         </p>
                     </div>
 
-                    {error && <div className="glass-error">{error}</div>}
-                    {message && <div className="glass-success">{message}</div>}
+  return (
+    <div className="auth-wrapper auth-with-waves">
+      {/* Background waves (behind everything) */}
+      <WavesBackground />
 
-                    {step === 'email' && (
-                        <form onSubmit={handleSendOTP}>
-                            <div className="glass-input-group">
-                                <label htmlFor="login-email">Email</label>
-                                <input
-                                    id="login-email"
-                                    type="email"
-                                    placeholder="your@email.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    disabled={loading}
-                                    autoComplete="email"
-                                />
-                            </div>
+      {/* Foreground content */}
+      <div className="glass-card fade-in-up hover-scale">
+        <div className="auth-brand">
+          <MMLogo className="auth-logo" />
+          <div className="auth-brand-name">MeetMint</div>
+        </div>
 
                             <div className="glass-input-group">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -363,8 +361,81 @@ function LoginPage({ onLogin, onGoToRegister }) {
                     </div>
                 </div>
             </div>
-        </>
-    )
+
+            <button className="glass-btn" disabled={loading}>
+              {loading ? "Sending otp…" : "Send otp"}
+            </button>
+
+            <div className="glass-footer">
+              Don’t have an account?{" "}
+              <button
+                type="button"
+                className="glass-link"
+                onClick={onGoToRegister}
+              >
+                Sign up
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === "otp" && (
+          <form onSubmit={handleVerifyOTP}>
+            <div className="glass-input-group">
+              <label>Email</label>
+              <input value={email} disabled />
+            </div>
+
+            <div className="glass-input-group">
+              <label>Otp code</label>
+              <input
+                value={otp}
+                onChange={(e) =>
+                  setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                disabled={loading}
+                placeholder="123456"
+                maxLength={6}
+                autoFocus
+              />
+            </div>
+
+            <button className="glass-btn" disabled={loading}>
+              {loading ? "Verifying…" : "Verify"}
+            </button>
+
+            <div className="otp-actions">
+              <button
+                type="button"
+                className="glass-link"
+                onClick={handleBackToEmail}
+              >
+                ← Change email
+              </button>
+              <button
+                type="button"
+                className="glass-link"
+                onClick={handleResendOTP}
+              >
+                Resend otp
+              </button>
+            </div>
+
+            <div className="glass-footer">
+              Don’t have an account?{" "}
+              <button
+                type="button"
+                className="glass-link"
+                onClick={onGoToRegister}
+              >
+                Sign up
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
 }
 
-export default LoginPage
+export default LoginPage;

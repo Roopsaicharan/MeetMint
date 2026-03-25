@@ -17,7 +17,7 @@ The following user stories were addressed in Sprint 1:
 ### Frontend (React + Vite)
 - [x] **Vibrant Theme Integration**: Implemented a deep blue vibrant theme with SVG waves, glassmorphism, and smooth animations.
 - [x] **"Sideways" Dashboard Layout**: Refactored the UI for horizontal scaling, featuring:
-    - Side-scrolling Project Cards for better density.
+    - Side scrolling Project Cards for better density.
     - Two-column Project Details view (Notes/RAG on left, AI Results on right).
 - [x] **Intelligent Task System**: 
     - Added status controls (TODO, IN PROGRESS, BLOCKED, DONE) to all action items.
