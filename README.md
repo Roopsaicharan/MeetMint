@@ -13,7 +13,7 @@ MeetMint is a full-stack web application that converts meeting notes or transcri
 - **Frontend**: React.js, Vite, Vanilla CSS
 - **Backend**: Go (Golang)
 - **Persistence**: SQLite
-- **Aesthetics**: "Vibrant Blue" 3D Motion Theme (Glassmorphism)
+- **Aesthetics**: "Vibrant Blue" 3D Motion Theme (Glassmorphism) 
 
 ## Core Features
 1. **Interactive Dashboard**: 3D tilt-responsive project cards with real-time progress indicators.
