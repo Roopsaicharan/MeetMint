@@ -7,7 +7,7 @@ function LoginPage({ onLogin, onGoToRegister }) {
     const [otp, setOtp] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [step, setStep] = useState('email') // 'email' | 'otp' | 'forgot' | 'reset-otp'
-    const [error, setError] = useState('')
+    const [error, setError] = useState('') 
     const [message, setMessage] = useState('')
     const [loading, setLoading] = useState(false)
 
