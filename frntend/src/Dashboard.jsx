@@ -326,6 +326,22 @@ function Dashboard({ user, onLogout }) {
         };
     };
 
+    const [allUsers, setAllUsers] = useState([]);
+
+    // Fetch All Users for Team Directory
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const resp = await fetch('http://localhost:5000/api/users/search?q=');
+                const data = await resp.json();
+                setAllUsers((data.users || []).map((u, i) => formatMember(u, i)));
+            } catch (err) {
+                console.error("Fetch users error:", err);
+            }
+        };
+        fetchUsers();
+    }, []);
+
     // Fetch Projects on Load (filtered by current user's membership)
     useEffect(() => {
         const fetchProjects = async () => {
@@ -644,26 +660,34 @@ function Dashboard({ user, onLogout }) {
         setChatHistory([]); // Reset chat history when switching projects
         setView('project');
 
-        // Fetch full project details (notes, tasks, members) from backend
+        // Fetch full project details (transcript/notes, tasks, members) from backend
         if (project.id && project.id.length === 36) {
             try {
                 const resp = await fetch(`http://localhost:5000/api/project-details?project_id=${project.id}`);
                 if (resp.ok) {
                     const details = await resp.json();
-                    // Update notes if available from backend
-                    if (details.notes) {
-                        setNotes(details.notes);
+                    
+                    // The transcript is stored in the meetings list (latest first)
+                    if (details.meetings && details.meetings.length > 0) {
+                        const latestMeeting = details.meetings[0];
+                        // Field from Go backend is Case-Sensitive (since no JSON tags in MeetingRow struct)
+                        const transcript = latestMeeting.TranscriptText || latestMeeting.transcript_text || "";
+                        setNotes(transcript);
+                        
+                        // If we have a summary from this meeting, load it too
+                        if (latestMeeting.SummaryText || latestMeeting.summary_text) {
+                            setSummary({
+                                summary: latestMeeting.SummaryText || latestMeeting.summary_text,
+                                decisions: [], // Future optimization
+                                action_items: details.tasks || []
+                            });
+                        }
                     }
-                    // Update summary/action items if available
-                    if (details.summary && details.summary.action_items && details.summary.action_items.length > 0) {
-                        setSummary(details.summary);
-                    }
+                    
                     // Update the project's membersList with fresh data
                     if (details.members && details.members.length > 0) {
                         const updatedProject = {
                             ...project,
-                            notes: details.notes || project.notes,
-                            summary: details.summary || project.summary,
                             membersList: details.members.map((m, i) => formatMember(m, i))
                         };
                         setActiveProject(updatedProject);
@@ -1375,7 +1399,7 @@ function Dashboard({ user, onLogout }) {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
                                                     <h3 style={{ marginBottom: '0.5rem' }}>{p.name}</h3>
-                                                    <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>{p.summary.summary.substring(0, 120)}...</p>
+                                                    <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>{p.summary.summary ? p.summary.summary.substring(0, 120) + "..." : "No summary available."}</p>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>{p.dueDate}</div>
@@ -1427,16 +1451,16 @@ function Dashboard({ user, onLogout }) {
                                 <h2>Team Directory</h2>
                             </div>
                             <div className="projects-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                {ALL_MEMBERS.map(m => (
+                                {allUsers.map(m => (
                                     <div key={m.id} className="ultra-card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                         <div className="av" style={{ width: '50px', height: '50px', background: m.color, fontSize: '1.2rem' }}>
                                             {m.initials}
-                                            <span className="av-presence" style={{ background: STATUS_COLORS[m.status] }}></span>
+                                            <span className="av-presence" style={{ background: STATUS_COLORS['online'] }}></span>
                                         </div>
                                         <div>
                                             <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{m.name}</div>
-                                            <div style={{ fontSize: '0.85rem', opacity: 0.6 }}>{m.role}</div>
-                                            <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '4px' }}>● {m.status}</div>
+                                            <div style={{ fontSize: '0.85rem', opacity: 0.6 }}>{m.email}</div>
+                                            <div style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: '4px' }}>● active</div>
                                         </div>
                                     </div>
                                 ))}
@@ -1464,7 +1488,7 @@ function Dashboard({ user, onLogout }) {
                                 </div>
                                 <div className="ultra-card" style={{ padding: '2rem', textAlign: 'center' }}>
                                     <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>👥</div>
-                                    <div style={{ fontSize: '2rem', fontWeight: 800 }}>{ALL_MEMBERS.length}</div>
+                                    <div style={{ fontSize: '2rem', fontWeight: 800 }}>{allUsers.length}</div>
                                     <div style={{ opacity: 0.5 }}>Team Members</div>
                                 </div>
                             </div>

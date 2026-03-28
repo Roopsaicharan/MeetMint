@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+
+# Go
+backend/meetmint-backend.exe
+backend/meetmint.db
+backend/.env
+backend/backend.exe
+*.exe
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+ai_server/temp_*
+ai_server/*.wav
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Misc
+*.zip
+*.log
+../test.wav
