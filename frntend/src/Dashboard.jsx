@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, memo } from 'react'
 import MMLogo from './MMLogo'
-import ProjectTabs from './ProjectTabs'
 import './index.css'
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProcessingScreen from './ProcessingScreen';
@@ -502,30 +501,39 @@ function Dashboard({ user, onLogout }) {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chatHistory, loadingAnswer])
 
-    try {
-      const response = await fetch('http://localhost:5000/api/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes })
-      })
+    // Helper to calculate days left
+    const calculateDaysLeft = (dateString) => {
+        const target = new Date(dateString);
+        const today = new Date();
+        const diffTime = target - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 0;
+    }
 
     const filteredProjects = projects.filter(p =>
         (p.name || '').toLowerCase().includes((searchQuery || '').toLowerCase())
     );
 
-      // Add default 'todo' status to all new action items
-      const dataWithStatus = {
-        ...data,
-        action_items: data.action_items.map((item) => ({
-          ...item,
-          status: 'todo'
-        }))
-      }
+    const handleVideoChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            setVideoFile(e.target.files[0])
+        }
+    }
 
-      setSummary(dataWithStatus)
+    const toggleSelectionMode = () => {
+        setSelectionMode(!selectionMode)
+        setSelectedProjects(new Set())
+    }
 
-      const newProgress = calculateProjectProgress(dataWithStatus)
-      const newMembers = calculateProjectMembers(dataWithStatus)
+    const toggleProjectSelection = (id) => {
+        const newSelection = new Set(selectedProjects)
+        if (newSelection.has(id)) {
+            newSelection.delete(id)
+        } else {
+            newSelection.add(id)
+        }
+        setSelectedProjects(newSelection)
+    }
 
     const handleSelectAll = () => {
         if (selectedProjects.size === filteredProjects.length) {
@@ -900,14 +908,7 @@ function Dashboard({ user, onLogout }) {
                 </div>
             </div>
         )
-      )
-    } catch (error) {
-      console.error('Error generating summary:', error)
-      alert('Failed to generate summary.\nIs the backend running?')
-    } finally {
-      setLoadingSummary(false)
     }
-  }
 
     // --- RENDER: PROJECT DETAILS VIEW ---
     if (view === 'project' && activeProject) {
@@ -1208,10 +1209,14 @@ function Dashboard({ user, onLogout }) {
             </div>
         )
     }
-  }
 
-  // Render: create project view
-  if (view === 'create') {
+    const handleDeleteProject = (id) => {
+        if (window.confirm("Are you sure you want to delete this project?")) {
+            setProjects(projects.filter(p => p.id !== id));
+        }
+    }
+
+    // --- RENDER: HOME (PROJECT LIST) VIEW ---
     return (
         <div className="dash-wrapper">
             <div className="dash-container">
@@ -1467,370 +1472,8 @@ function Dashboard({ user, onLogout }) {
                     )}
                 </main>
             </div>
-          </header>
-
-          <main style={{ maxWidth: '900px', margin: '0 auto', padding: '3rem 2rem' }}>
-            <section className="glass-section fade-in">
-              <h3>Start New Project</h3>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr',
-                  gap: '1rem',
-                  marginTop: '1.5rem'
-                }}
-              >
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Project Name</label>
-                  <input
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    className="glass-text-input"
-                    placeholder="Enter project name"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-                    Due Date (for tracking)
-                  </label>
-                  <input
-                    type="date"
-                    value={newProjectDate}
-                    onChange={(e) => setNewProjectDate(e.target.value)}
-                    className="glass-text-input"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>
-                    Upload Meeting Video
-                  </label>
-                  <input type="file" accept="video/*" onChange={handleVideoChange} />
-                </div>
-
-                <button
-                  onClick={handleCreateProject}
-                  disabled={loadingVideo}
-                  className="glass-btn-action"
-                  style={{ marginTop: '1rem' }}
-                >
-                  {loadingVideo ? 'Processing & Analyzing...' : 'Create Project'}
-                </button>
-              </div>
-            </section>
-          </main>
         </div>
-      </div>
     )
-  }
-
-  // Render: project details view
-  if (view === 'project' && activeProject) {
-    return (
-      <div className="dash-wrapper dashboard-shell">
-        <div className="dash-container">
-          <header className="dash-header dash-topbar">
-            <div className="header-content">
-              <div className="logo-section">
-                <div className="brand-header">
-                  <button
-                    onClick={() => setView('home')}
-                    className="glass-btn-secondary"
-                    style={{ padding: '5px 10px' }}
-                  >
-                    ← Back
-                  </button>
-
-                  <h1 className="dash-logo" onClick={() => setView('home')} style={{ margin: 0 }}>
-                    MeetMint
-                  </h1>
-                </div>
-
-                <p className="dash-subtitle">
-                  Project: {activeProject.name} ({activeProject.daysLeft} days left)
-                </p>
-              </div>
-
-              <div className="dash-user">
-                <span className="dash-email">{user?.email}</span>
-                <button className="dash-logout" onClick={onLogout}>
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </header>
-
-          <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
-            <div className="details-grid">
-              {/* Left Side: Notes & rag */}
-              <div className="details-left">
-                <section className="glass-section fade-in">
-                  <div className="section-header">
-                    <h3>Meeting Notes</h3>
-                    <span className="glass-badge">Review</span>
-                  </div>
-
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows="12"
-                    className="glass-textarea"
-                    placeholder="Notes will appear here..."
-                  />
-
-                  <button
-                    onClick={generateSummary}
-                    disabled={loadingSummary || !notes}
-                    className="glass-btn-secondary"
-                    style={{ width: '100%', marginTop: '1rem' }}
-                  >
-                    {loadingSummary ? 'Generating Summary...' : 'Generate Summary'}
-                  </button>
-                </section>
-
-                <section className="glass-section">
-                  <h3>Ask Meeting Context (rag)</h3>
-
-                  <div className="dash-input-row" style={{ marginTop: '1rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Who owns the UI task?"
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      className="glass-text-input"
-                      onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
-                    />
-                    <button
-                      onClick={askQuestion}
-                      disabled={loadingAnswer}
-                      className="glass-btn-secondary"
-                    >
-                      {loadingAnswer ? 'Asking...' : 'Ask'}
-                    </button>
-                  </div>
-
-                  {answer && (
-                    <div className="glass-answer fade-in" style={{ marginTop: '1.5rem' }}>
-                      <p className="glass-answer-text">{answer.answer}</p>
-                      <small className="glass-citation">Source: {answer.citation}</small>
-                    </div>
-                  )}
-                </section>
-              </div>
-
-              {/* Right Side: Summary / Tasks / Chat */}
-              <div className="details-right">
-                <ProjectTabs
-                  rightTab={rightTab}
-                  setRightTab={setRightTab}
-                  summaryData={summary || activeProject.summary}
-                  activeProject={activeProject}
-                  updateTaskStatus={updateTaskStatus}
-                  projectMessages={projectChats[activeProject.id] || []}
-                  chatInput={chatInput}
-                  setChatInput={setChatInput}
-                  onSendMessage={handleSendMessage}
-                  currentUserEmail={user?.email || ''}
-                />
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-    )
-  }
-
-  // Render: home (project list)
-  return (
-    <div className="dash-wrapper dashboard-shell">
-      <div className="dash-container">
-        <header className="dash-header dash-topbar">
-          <div className="header-content">
-            <div className="logo-section">
-              <div className="brand-header">
-                <MMLogo className="header-logo" />
-                <h1 className="dash-logo" onClick={() => setView('home')}>
-                  MeetMint
-                </h1>
-              </div>
-              <p className="dash-subtitle">Your Projects</p>
-            </div>
-
-            <div className="dash-user">
-              <div className="search-box dash-search">
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <span className="dash-email">{user?.email}</span>
-
-              <button className="dash-logout" onClick={onLogout}>
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '3rem 2rem' }}>
-          <div className="section-header">
-            <h2>Active Projects</h2>
-
-            <div className="header-actions">
-              {selectionMode ? (
-                <>
-                  <button className="glass-btn-secondary" onClick={handleSelectAll}>
-                    {selectedProjects.size === filteredProjects.length
-                      ? 'Deselect All'
-                      : 'Select All'}
-                  </button>
-
-                  <button
-                    className="glass-btn-action"
-                    style={{ backgroundColor: '#ff3b30', borderColor: '#ff3b30' }}
-                    onClick={handleDeleteSelected}
-                    disabled={selectedProjects.size === 0}
-                  >
-                    Delete ({selectedProjects.size})
-                  </button>
-
-                  <button className="glass-btn-secondary" onClick={toggleSelectionMode}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    className="icon-btn"
-                    onClick={toggleSelectionMode}
-                    title="Batch Delete"
-                  >
-                    🗑️
-                  </button>
-
-                  <button className="glass-btn-action" onClick={() => setView('create')}>
-                    + New Project
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="projects-grid">
-            {filteredProjects.map((project) => {
-              const isSelected = selectionMode && selectedProjects.has(project.id)
-              const isActive = project.status === 'Active'
-              const progressNum = project.progress || 0
-              const progressScale = Math.max(0, Math.min(1, progressNum / 100))
-
-              return (
-                <div
-                  key={project.id}
-                  className={`project-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() =>
-                    selectionMode ? toggleProjectSelection(project.id) : openProject(project)
-                  }
-                  style={{
-                    border: isSelected ? '2px solid #60a5fa' : '',
-                    transform: isSelected ? 'translateY(-5px)' : ''
-                  }}
-                >
-                  {selectionMode && (
-                    <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedProjects.has(project.id)}
-                        onChange={() => {}}
-                        style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                      />
-                    </div>
-                  )}
-
-                  <div className="project-header">
-                    <span className={`time-badge ${project.daysLeft < 3 ? 'urgent' : 'normal'}`}>
-                      {project.daysLeft} Days Left
-                    </span>
-                    <span className="project-menu">⋮</span>
-                  </div>
-
-                  <h3 className="project-title">{project.name}</h3>
-
-                  <div className="project-meta">
-                    <div className="meta-item">
-                      <span className="meta-icon"></span>
-                      <span>Due: {project.dueDate}</span>
-                    </div>
-
-                    <div className="meta-item">
-                      <span className="meta-icon"></span>
-                      <span>{project.members || 1} Members</span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`status-badge ${isActive ? 'active' : 'review'} status-pill ${
-                      isActive ? 'is-active' : ''
-                    }`}
-                  >
-                    {project.status}
-                  </span>
-
-                  <div className="progress-section">
-                    <div className="progress-label">
-                      <span>Project Status</span>
-                      <span
-                        className={`task-status-badge ${getProjectStatusTerm(project)
-                          .toLowerCase()
-                          .replace(' ', '')}`}
-                      >
-                        {getProjectStatusTerm(project)}
-                      </span>
-                    </div>
-
-                    <div className="progress-bar progress-track">
-                      <div
-                        className="progress-fill"
-                        style={{
-                          width: `${progressNum}%`,
-                          '--p': progressScale
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="quick-notes-container" onClick={(e) => e.stopPropagation()}>
-                    <label className="quick-notes-label">Quick Notes</label>
-                    <textarea
-                      className="quick-notes-box"
-                      placeholder="Add project notes..."
-                      value={project.notes || ''}
-                      onChange={(e) => updateProjectNotes(project.id, e.target.value)}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-
-            {!selectionMode && (
-              <div
-                className="project-card create-new create-project-tile"
-                onClick={() => setView('create')}
-              >
-                <div className="create-project-plus">+</div>
-                <div className="create-text">Create New Project</div>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    </div>
-  )
 }
 
 export default Dashboard

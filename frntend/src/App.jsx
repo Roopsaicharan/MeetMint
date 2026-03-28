@@ -9,6 +9,7 @@ import MotionTheme from './MotionTheme'
 import BackgroundParticles from './BackgroundParticles'
 
 function App() {
+  const navigate = useNavigate();
   const SESSION_TIMEOUT = 3600000; // 1 hour in milliseconds 
 
   const [user, setUser] = useState(() => {
