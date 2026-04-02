@@ -84,7 +84,7 @@ func SearchUsers(query string) ([]UserRow, error) {
 	}
 	defer rows.Close()
 
-	var users []UserRow
+	users := []UserRow{}
 	for rows.Next() {
 		var u UserRow
 		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt); err != nil {
@@ -117,7 +117,7 @@ func GetAllProjects() ([]ProjectRow, error) {
 	}
 	defer rows.Close()
 
-	var projects []ProjectRow
+	projects := []ProjectRow{}
 	for rows.Next() {
 		var p ProjectRow
 		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedBy, &p.CreatedAt, &p.DueDate); err != nil {
@@ -172,7 +172,7 @@ func GetProjectsByUser(userID string) ([]ProjectRow, error) {
 	}
 	defer rows.Close()
 
-	var projects []ProjectRow
+	projects := []ProjectRow{}
 	for rows.Next() {
 		var p ProjectRow
 		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedBy, &p.CreatedAt, &p.DueDate); err != nil {
@@ -226,7 +226,7 @@ func GetTasksByProject(projectID string) ([]TaskRow, error) {
 	}
 	defer rows.Close()
 
-	var tasks []TaskRow
+	tasks := []TaskRow{}
 	for rows.Next() {
 		var t TaskRow
 		if err := rows.Scan(&t.ID, &t.MeetingID, &t.Title, &t.Description, &t.OwnerID, &t.Status, &t.DueDate, &t.CreatedAt); err != nil {
@@ -274,7 +274,7 @@ func GetMeetingsByProject(projectID string) ([]MeetingRow, error) {
 	}
 	defer rows.Close()
 
-	var meetings []MeetingRow
+	meetings := []MeetingRow{}
 	for rows.Next() {
 		var m MeetingRow
 		if err := rows.Scan(&m.ID, &m.ProjectID, &m.TranscriptText, &m.SummaryText, &m.CreatedAt); err != nil {
@@ -325,7 +325,7 @@ func GetTasksByUser(userID string) ([]TaskRow, error) {
 	}
 	defer rows.Close()
 
-	var tasks []TaskRow
+	tasks := []TaskRow{}
 	for rows.Next() {
 		var t TaskRow
 		if err := rows.Scan(&t.ID, &t.MeetingID, &t.Title, &t.Description, &t.OwnerID, &t.Status, &t.DueDate, &t.CreatedAt); err != nil {
@@ -372,7 +372,7 @@ func GetRAGChunksByMeeting(meetingID string) ([]RAGChunkRow, error) {
 	}
 	defer rows.Close()
 
-	var chunks []RAGChunkRow
+	chunks := []RAGChunkRow{}
 	for rows.Next() {
 		var c RAGChunkRow
 		if err := rows.Scan(&c.ID, &c.MeetingID, &c.ChunkText, &c.Embedding, &c.CreatedAt); err != nil {
@@ -547,7 +547,7 @@ func GetProjectMembersByProject(projectID string) ([]UserRow, error) {
 	}
 	defer rows.Close()
 
-	var users []UserRow
+	users := []UserRow{}
 	for rows.Next() {
 		var u UserRow
 		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt); err != nil {

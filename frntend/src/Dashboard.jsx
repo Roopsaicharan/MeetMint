@@ -707,13 +707,13 @@ function Dashboard({ user, onLogout }) {
     }
 
     const calculateProjectMembers = (summaryData) => {
-        if (!summaryData || !summaryData.action_items || summaryData.action_items.length === 0) return 1;
+        if (!summaryData || !summaryData.action_items) return 1;
         const owners = new Set(summaryData.action_items.map(item => item.owner));
         return owners.size;
     }
 
     const getProjectStatusTerm = (project) => {
-        if (!project.summary || !project.summary.action_items || project.summary.action_items.length === 0) return 'TODO';
+        if (!project.summary || !project.summary.action_items) return 'TODO';
         const items = project.summary.action_items;
         if (items.some(i => i.status === 'blocked')) return 'BLOCKED';
         if (project.progress === 100) return 'DONE';
@@ -752,7 +752,7 @@ function Dashboard({ user, onLogout }) {
             }
 
             // 2. Update Local State only if backend accepts
-            const updatedActionItems = summary.action_items.map((item, index) =>
+            const updatedActionItems = (summary?.action_items || []).map((item, index) =>
                 index === taskIndex ? { ...item, status: newStatus } : item
             );
 
@@ -795,7 +795,7 @@ function Dashboard({ user, onLogout }) {
             // Add default 'todo' status to all new action items
             const dataWithStatus = {
                 ...data,
-                action_items: data.action_items.map(item => ({ ...item, status: 'todo' }))
+                action_items: (data.action_items || []).map(item => ({ ...item, status: 'todo' }))
             };
 
             setSummary(dataWithStatus);
@@ -1163,11 +1163,11 @@ function Dashboard({ user, onLogout }) {
                                                         <MemberStack project={activeProject} onAddMember={handleAddMember} showAdd={true} centered={true} />
                                                     </div>
                                                 </div>
-                                                <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>{(summary ? summary.action_items : activeProject.summary.action_items).length} total</div>
+                                                <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>{(summary?.action_items || activeProject?.summary?.action_items || []).length} total</div>
                                             </div>
 
                                             <div className="glass-task-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                                {(summary ? summary.action_items : activeProject.summary.action_items).map((t, i) => (
+                                                {(summary?.action_items || activeProject?.summary?.action_items || []).map((t, i) => (
                                                     <div key={i} className={`ultra-card ${t.owner_id !== user.id ? 'read-only' : ''}`} style={{
                                                         padding: '1.25rem 1.5rem',
                                                         background: 'rgba(255,255,255,0.02)'
