@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -30,8 +30,10 @@ type ActionItem struct {
 }
 
 type AskResponse struct {
-	Answer   string `json:"answer"`
-	Citation string `json:"citation"`
+	Answer      string   `json:"answer"`
+	Explanation string   `json:"explanation,omitempty"`
+	ActionItems []string `json:"action_items,omitempty"`
+	Citation    string   `json:"citation,omitempty"`
 }
 
 type LoginRequest struct {
@@ -62,6 +64,12 @@ type UpdateTaskRequest struct {
 	TaskID string `json:"task_id"`
 	UserID string `json:"user_id"`
 	Status string `json:"status"`
+}
+
+type UpdateTaskDetailRequest struct {
+	TaskID  string  `json:"task_id"`
+	OwnerID *string `json:"owner_id"`
+	Title   string  `json:"title"`
 }
 
 type ForgotPasswordRequest struct {
@@ -148,10 +156,14 @@ func SetupRouter() *http.ServeMux {
 	mux.HandleFunc("/api/project-details", handleProjectDetails)
 	mux.HandleFunc("/api/projects/delete", handleDeleteProject)
 	mux.HandleFunc("/api/projects/members/add", handleAddMember)
+	mux.HandleFunc("/api/projects/members/remove", handleRemoveMember)
 	mux.HandleFunc("/api/projects/invite", handleInviteMember)
 
 	// 4. Task Endpoints
 	mux.HandleFunc("/api/tasks/update", handleUpdateTaskStatus)
+	mux.HandleFunc("/api/tasks/edit", handleUpdateTask)
+	mux.HandleFunc("/api/tasks/delete", handleDeleteTask)
+	mux.HandleFunc("/api/tasks/create", handleCreateTask)
 
 	// 5. User Endpoints
 	mux.HandleFunc("/api/users/search", handleSearchUsers)
@@ -310,52 +322,248 @@ func handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSummary(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
 	var body struct {
-		Notes string `json:"notes"`
+		Notes     string `json:"notes"`      // the transcript text
+		ProjectID string `json:"project_id"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 
-	aiClient := &http.Client{Timeout: 10 * time.Second}
-	aiReqBody, _ := json.Marshal(map[string]string{"notes": body.Notes})
-	aiResp, err := aiClient.Post("http://localhost:5001/summarize", "application/json", bytes.NewBuffer(aiReqBody))
-
-	var resp SummaryResponse
-	if err == nil && aiResp.StatusCode == 200 {
-		json.NewDecoder(aiResp.Body).Decode(&resp)
-		aiResp.Body.Close()
-	} else {
-		resp = SummaryResponse{Summary: "Meeting summary fallback.", ActionItems: []ActionItem{}}
-	}
-
-	projectID := r.URL.Query().Get("project_id")
-	var pID *string
-	if projectID != "" {
-		pID = &projectID
-	}
-	meetingID, _ := InsertMeeting(pID, body.Notes, resp.Summary)
-
-	// Persist tasks
-	for i, item := range resp.ActionItems {
-		var ownerID *string
-		DB.QueryRow("SELECT id FROM users WHERE name LIKE '%'||?||'%' LIMIT 1", item.Owner).Scan(&ownerID)
-		taskID, _ := InsertTask(&meetingID, pID, item.Title, "", ownerID, nil, nil)
-		resp.ActionItems[i].ID = taskID
-		if ownerID != nil {
-			resp.ActionItems[i].OwnerID = *ownerID
+	// ── Call Gemini ───────────────────────────────────────────────────────
+	analysis, err := AnalyzeTranscriptWithGemini(body.Notes)
+	if err != nil {
+		log.Printf("❌ Gemini Analysis failed: %v", err)
+		// Graceful fallback if Gemini fails for any reason
+		analysis = MeetingAnalysis{
+			Summary: fmt.Sprintf("Summary could not be generated: %v. Please check your API key and connection.", err),
+			Tasks:   []AITask{},
 		}
 	}
 
+	// ── Save meeting to database ──────────────────────────────────────────
+	var pID *string
+	if body.ProjectID != "" {
+		pID = &body.ProjectID
+	}
+	meetingID, _ := InsertMeeting(pID, body.Notes, analysis.Summary)
+
+	// ── Save each task to database ────────────────────────────────────────
+	type TaskResponse struct {
+		ID          string  `json:"id"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		Owner       string  `json:"owner"`
+		DueDate     *string `json:"due_date"`
+	}
+
+	var savedTasks []TaskResponse
+
+	for _, task := range analysis.Tasks {
+		// Try to find the owner in the users table by name
+		var ownerID *string
+		var foundID string
+		err := DB.QueryRow(
+			`SELECT id FROM users WHERE name LIKE '%' || ? || '%' LIMIT 1`,
+			task.Owner,
+		).Scan(&foundID)
+		if err == nil {
+			ownerID = &foundID
+		}
+
+		// Parse due date if present
+		var dueTime *time.Time
+		if task.DueDate != nil {
+			t, err := time.Parse("2006-01-02", *task.DueDate)
+			if err == nil {
+				dueTime = &t
+			}
+		}
+
+		// Insert into tasks table
+		taskID, _ := InsertTask(
+			&meetingID,
+			pID,
+			task.Title,
+			task.Description,
+			ownerID,
+			task.Owner, // AI-extracted raw owner name
+			dueTime,
+			nil,
+		)
+
+		savedTasks = append(savedTasks, TaskResponse{
+			ID:          taskID,
+			Title:       task.Title,
+			Description: task.Description,
+			Owner:       task.Owner,
+			DueDate:     task.DueDate,
+		})
+	}
+
+	// ── Send response back to frontend ────────────────────────────────────
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"meeting_id":   meetingID,
+		"summary":      analysis.Summary,
+		"action_items": savedTasks,
+	})
 }
 
 func handleAsk(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(AskResponse{
-		Answer:   "This is an AI response based on meeting transcripts.",
-		Citation: "Internal RAG context",
-	})
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Question  string `json:"question"`
+		ProjectID string `json:"project_id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	log.Printf("📥 RAG Ask received: project=%s question=%q", req.ProjectID, req.Question)
+
+	// 1. Fetch the transcript from meetings table for this project
+	meetings, err := GetMeetingsByProject(req.ProjectID)
+	if err != nil || len(meetings) == 0 {
+		log.Printf("⚠️ No meetings found for project %s: %v", req.ProjectID, err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "No transcript data available for this project yet. Please upload a meeting first!", Citation: "Knowledge Base"})
+		return
+	}
+
+	// Combine all transcripts from all meetings in this project
+	var fullTranscript strings.Builder
+	for _, m := range meetings {
+		if m.TranscriptText != "" {
+			fullTranscript.WriteString(m.TranscriptText)
+			fullTranscript.WriteString("\n\n")
+		}
+	}
+	transcript := strings.TrimSpace(fullTranscript.String())
+
+	if transcript == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "The meeting transcript is empty. Please upload a meeting with audio content.", Citation: "Knowledge Base"})
+		return
+	}
+
+	log.Printf("📝 RAG: Transcript loaded (%d chars). Chunking...", len(transcript))
+
+	// 2. Chunk the transcript on-the-fly
+	chunks := ChunkTranscript(transcript)
+	if len(chunks) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "Could not process the transcript.", Citation: "Internal System"})
+		return
+	}
+
+	log.Printf("📦 RAG: %d chunks created. Embedding question...", len(chunks))
+
+	// 3. Convert question to embedding (GEMINI)
+	qVector, err := GetGeminiEmbedding(req.Question)
+	if err != nil {
+		log.Printf("❌ RAG Ask Failed (Question Embed): %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "Error generating question embedding. Check your Gemini API key.", Citation: "Internal System"})
+		return
+	}
+
+	// 4. Embed each chunk and rank by cosine similarity
+	type ScoredChunk struct {
+		Content string
+		Score   float32
+	}
+	var scored []ScoredChunk
+
+	log.Printf("🔍 RAG: Embedding %d chunks and computing similarity...", len(chunks))
+	for i, chunkText := range chunks {
+		chunkVec, err := GetGeminiEmbedding(chunkText)
+		if err != nil {
+			log.Printf("⚠️ RAG: Skipping chunk %d embedding: %v", i, err)
+			continue
+		}
+		score := CosineSimilarity(qVector, chunkVec)
+		scored = append(scored, ScoredChunk{Content: chunkText, Score: score})
+	}
+
+	if len(scored) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "Failed to process transcript chunks. Please try again.", Citation: "Internal System"})
+		return
+	}
+
+	// 5. Sort by similarity (Top 5)
+	for i := 0; i < len(scored)-1; i++ {
+		for j := i + 1; j < len(scored); j++ {
+			if scored[j].Score > scored[i].Score {
+				scored[i], scored[j] = scored[j], scored[i]
+			}
+		}
+	}
+	if len(scored) > 5 {
+		scored = scored[:5]
+	}
+
+	log.Printf("✅ RAG: Top %d chunks selected (best score: %.4f)", len(scored), scored[0].Score)
+
+	// 6. Construct Prompt with top chunks as context
+	var context strings.Builder
+	for _, s := range scored {
+		context.WriteString(s.Content + "\n\n")
+	}
+
+	prompt := fmt.Sprintf(`You are an AI meeting assistant.
+STRICT RULES:
+- Answer ONLY using the provided context
+- Do NOT make up information
+- If not found, say: "Not found in meeting data"
+
+YOU MUST RETURN ONLY A JSON OBJECT.
+Structure:
+{
+  "answer": "short direct answer (1 sentence)",
+  "explanation": "detailed explanation if needed (2-3 sentences)",
+  "action_items": ["task 1", "task 2"],
+  "citation": "Meeting Transcript"
 }
+
+CONTEXT:
+%s
+
+QUESTION:
+%s`, context.String(), req.Question)
+
+	// 7. Call Gemini RAG
+	rawAnswer, err := CallGeminiRAG(prompt)
+	if err != nil {
+		log.Printf("❌ Gemini call failed: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AskResponse{Answer: "I'm sorry, I'm having trouble thinking right now."})
+		return
+	}
+
+	// 8. Parse JSON from AI
+	var structured AskResponse
+	cleanJSON := cleanJSONResponse(rawAnswer)
+
+	if err := json.Unmarshal([]byte(cleanJSON), &structured); err != nil {
+		log.Printf("❌ Failed to parse structured RAG JSON: %v. Raw: %s", err, rawAnswer)
+		structured = AskResponse{
+			Answer:   rawAnswer,
+			Citation: "Meeting Data",
+		}
+	}
+
+	log.Printf("✅ RAG Answer generated for project %s", req.ProjectID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(structured)
+}
+
 
 func handleUploadVideo(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(50 << 20)
@@ -410,9 +618,50 @@ func handleUploadVideo(w http.ResponseWriter, r *http.Request) {
 		}
 
 		UpdateProcessingJob(pID, 80, 5, "processing", nil)
-		InsertMeeting(&pID, transcript, "")
+		
+		// --- AI ANALYSIS: Summary & Tasks ---
+		log.Printf("🧠 Gemini: Analyzing transcript for summary and tasks for project %s", pID)
+		analysis, err := AnalyzeTranscriptWithGemini(transcript)
+		sumTxt := ""
+		if err == nil {
+			sumTxt = analysis.Summary
+		} else {
+			log.Printf("❌ Gemini Analysis failed in background: %v", err)
+			sumTxt = "Summary analysis failed, but transcript is available."
+		}
+
+		mID, _ := InsertMeeting(&pID, transcript, sumTxt)
+		
+		// Save tasks if any were extracted
+		if err == nil && len(analysis.Tasks) > 0 {
+			log.Printf("📝 Saving %d extracted tasks for project %s", len(analysis.Tasks), pID)
+			for _, t := range analysis.Tasks {
+				// Try to find owner ID
+				var ownerID *string
+				var foundID string
+				dbErr := DB.QueryRow(`SELECT id FROM users WHERE name LIKE '%' || ? || '%' LIMIT 1`, t.Owner).Scan(&foundID)
+				if dbErr == nil {
+					ownerID = &foundID
+				}
+				
+				// Parse due date
+				var dueTime *time.Time
+				if t.DueDate != nil {
+					dt, parseErr := time.Parse("2006-01-02", *t.DueDate)
+					if parseErr == nil {
+						dueTime = &dt
+					}
+				}
+				
+				InsertTask(&mID, &pID, t.Title, t.Description, ownerID, t.Owner, dueTime, nil)
+			}
+		}
+
+		log.Printf("📦 RAG: Starting Gemini chunking and embedding for meeting %s", mID)
+		ProcessRAG(mID, transcript)
+		
 		UpdateProcessingJob(pID, 100, 6, "done", nil)
-		log.Printf("✅ Processing complete for project %s", pID)
+		log.Printf("✅ Processing, AI Analysis, and RAG complete for project %s", pID)
 	}(projectID, header.Filename, path)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -453,11 +702,64 @@ func handleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&req)
 	isOwner, _ := checkTaskOwnership(req.UserID, req.TaskID)
 	if !isOwner {
+		// Also allow if the user is a project member/admin (simple logic here)
+		// For now simple ownership check
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	DB.Exec("UPDATE tasks SET status = ? WHERE id = ?", req.Status, req.TaskID)
 	w.WriteHeader(http.StatusOK)
+}
+
+func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req UpdateTaskDetailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+
+	err := UpdateTaskDetail(req.TaskID, req.OwnerID, req.Title)
+	if err != nil {
+		log.Printf("❌ Failed to update task detail: %v", err)
+		http.Error(w, "Update failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	var req struct{ TaskID string `json:"task_id"` }
+	json.NewDecoder(r.Body).Decode(&req)
+	DeleteTask(req.TaskID)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ProjectID   string  `json:"project_id"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		OwnerID     *string `json:"owner_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+
+	taskID, err := InsertTask(nil, &req.ProjectID, req.Title, req.Description, req.OwnerID, "", nil, nil)
+	if err != nil {
+		log.Printf("❌ Failed to create task: %v", err)
+		http.Error(w, "Creation failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": taskID})
 }
 
 func handleForgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -507,6 +809,16 @@ func handleAddMember(w http.ResponseWriter, r *http.Request) {
 	var req AddMemberRequest
 	json.NewDecoder(r.Body).Decode(&req)
 	InsertProjectMember(req.ProjectID, req.UserID, req.Role)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleRemoveMember(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ProjectID string `json:"project_id"`
+		UserID    string `json:"user_id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	RemoveProjectMember(req.ProjectID, req.UserID)
 	w.WriteHeader(http.StatusOK)
 }
 

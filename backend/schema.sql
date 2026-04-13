@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     title       TEXT,
     description TEXT,
     owner_id    TEXT REFERENCES users(id),
+    owner_name  TEXT, 
     status      TEXT DEFAULT 'todo',
     due_date    DATETIME,
     created_by  TEXT REFERENCES users(id),

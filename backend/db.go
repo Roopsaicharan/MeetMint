@@ -66,6 +66,7 @@ func InitDB() {
 		// Extra Migrations (SQLite style - column exists check is different, but we'll try simple ALTERs)
 		_, _ = DB.Exec("ALTER TABLE meetings ADD COLUMN summary_text TEXT;") // Will fail if already exists, which is fine
 		_, _ = DB.Exec("ALTER TABLE meetings ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE CASCADE;")
+		_, _ = DB.Exec("ALTER TABLE tasks ADD COLUMN owner_name TEXT;")
 
 		fmt.Println("--------------------------------------------------")
 		fmt.Println("🏁 DATABASE SCHEMA INITIALIZATION COMPLETED")

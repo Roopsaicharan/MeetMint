@@ -286,7 +286,7 @@ func TestInsertTask(t *testing.T) {
 	mid, _ := InsertMeeting(&pid, "transcript", "summary")
 	due := time.Now().Add(48 * time.Hour)
 
-	taskID, err := InsertTask(&mid, &pid, "Build API", "description", &userID, &due, &userID)
+	taskID, err := InsertTask(&mid, &pid, "Build API", "description", &userID, "Leo", &due, &userID)
 	if err != nil {
 		t.Fatalf("InsertTask: unexpected error: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestInsertTask_NilOwner(t *testing.T) {
 	mid, _ := InsertMeeting(&pid, "t", "s")
 	due := time.Now().Add(24 * time.Hour)
 
-	taskID, err := InsertTask(&mid, &pid, "Unowned Task", "", nil, &due, nil)
+	taskID, err := InsertTask(&mid, &pid, "Unowned Task", "", nil, "Someone", &due, nil)
 	if err != nil {
 		t.Fatalf("InsertTask (nil owner): unexpected error: %v", err)
 	}
@@ -316,8 +316,8 @@ func TestGetTasksByProject(t *testing.T) {
 	pid, _ := InsertProject("Project X", nil, "")
 	mid, _ := InsertMeeting(&pid, "t", "s")
 	due := time.Now().Add(24 * time.Hour)
-	InsertTask(&mid, &pid, "Task A", "", &userID, &due, nil)
-	InsertTask(&mid, &pid, "Task B", "", &userID, &due, nil)
+	InsertTask(&mid, &pid, "Task A", "", &userID, "Mia", &due, nil)
+	InsertTask(&mid, &pid, "Task B", "", &userID, "Mia", &due, nil)
 
 	tasks, err := GetTasksByProject(pid)
 	if err != nil {
@@ -335,8 +335,8 @@ func TestGetTasksByUser(t *testing.T) {
 	pid, _ := InsertProject("P", nil, "")
 	mid, _ := InsertMeeting(&pid, "t", "s")
 	due := time.Now().Add(24 * time.Hour)
-	InsertTask(&mid, &pid, "Ned's Task", "", &u1, &due, nil)
-	InsertTask(&mid, &pid, "Ora's Task", "", &u2, &due, nil)
+	InsertTask(&mid, &pid, "Ned's Task", "", &u1, "Ned", &due, nil)
+	InsertTask(&mid, &pid, "Ora's Task", "", &u2, "Ora", &due, nil)
 
 	tasks, err := GetTasksByUser(u1)
 	if err != nil {
@@ -353,7 +353,7 @@ func TestCheckTaskOwnership_IsOwner(t *testing.T) {
 	pid, _ := InsertProject("P", nil, "")
 	mid, _ := InsertMeeting(&pid, "t", "s")
 	due := time.Now().Add(24 * time.Hour)
-	taskID, _ := InsertTask(&mid, &pid, "Pat's Task", "", &userID, &due, nil)
+	taskID, _ := InsertTask(&mid, &pid, "Pat's Task", "", &userID, "Pat", &due, nil)
 
 	isOwner, err := checkTaskOwnership(userID, taskID)
 	if err != nil {
@@ -371,7 +371,7 @@ func TestCheckTaskOwnership_NotOwner(t *testing.T) {
 	pid, _ := InsertProject("P", nil, "")
 	mid, _ := InsertMeeting(&pid, "t", "s")
 	due := time.Now().Add(24 * time.Hour)
-	taskID, _ := InsertTask(&mid, &pid, "Quinn's Task", "", &u1, &due, nil)
+	taskID, _ := InsertTask(&mid, &pid, "Quinn's Task", "", &u1, "Quinn", &due, nil)
 
 	isOwner, err := checkTaskOwnership(u2, taskID)
 	if err != nil {

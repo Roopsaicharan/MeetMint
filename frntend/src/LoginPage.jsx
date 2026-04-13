@@ -165,7 +165,7 @@ function LoginPage({ onLogin, onGoToRegister }) {
                     <div className="logo-area">
                         <div className="auth-brand">
                             <MMLogo className="auth-logo" />
-                            <span className="auth-brand-name">MeetMint</span>
+                            <span className="ultra-clear-logo-text">MEETMINT</span>
                         </div>
                         <h1 className="glass-title">
                             {step === 'forgot' ? 'Reset Password' : step === 'reset-otp' ? 'Verification' : 'Welcome Back'}

@@ -177,6 +177,23 @@ const AddMemberPanel = ({ project, onAdd, onClose, anchorRect, centered = false 
             </div>
 
             <div className="amp-divider"></div>
+            
+            {(project.membersList || []).length > 0 && (
+                <>
+                    <div className="amp-section-label">Current Members (Remove)</div>
+                    <div className="amp-list" style={{ maxHeight: '150px' }}>
+                        {project.membersList.map(m => (
+                            <div key={m.id} className="amp-item">
+                                <span className="amp-name" style={{ flex: 1 }}>{m.name}</span>
+                                <button className="amp-add" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => {
+                                    if(window.removeMember) window.removeMember(project.id, m.id);
+                                }}>✕</button>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="amp-divider"></div>
+                </>
+            )}
 
             <div className="amp-section-label">Email Invite</div>
             <div className="amp-invite-wrap" style={{ display: 'flex', gap: '8px', padding: '0 12px 12px' }}>
@@ -225,7 +242,7 @@ const AddMemberPanel = ({ project, onAdd, onClose, anchorRect, centered = false 
     );
 };
 
-const MemberStack = ({ project, onAddMember, showAdd = true, centered = false }) => {
+const MemberStack = ({ project, onAddMember, onRemoveMember, showAdd = true, centered = false }) => {
     const [panelAnchor, setPanelAnchor] = useState(null);
     const members = project.membersList || [];
     const MAX_VISIBLE = 4;
@@ -247,6 +264,28 @@ const MemberStack = ({ project, onAddMember, showAdd = true, centered = false })
                                 <span className="av-tooltip-name">{m.name}</span>
                                 <span className="av-tooltip-role">{m.role}</span>
                                 <span className={`av-tooltip-status ${m.status}`}>● {m.status}</span>
+                                {onRemoveMember && (
+                                    <button 
+                                        className="av-remove-btn" 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemoveMember(project.id, m.id);
+                                        }}
+                                        style={{ 
+                                            marginTop: '8px', 
+                                            background: 'rgba(239, 68, 68, 0.1)', 
+                                            color: '#ef4444',
+                                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                                            borderRadius: '4px',
+                                            padding: '2px 8px',
+                                            fontSize: '0.7rem',
+                                            cursor: 'pointer',
+                                            width: 'fit-content'
+                                        }}
+                                    >
+                                        Remove Member
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -283,7 +322,7 @@ const MemberStack = ({ project, onAddMember, showAdd = true, centered = false })
     );
 };
 
-function Dashboard({ user, onLogout }) {
+function Dashboard({ user, onLogout, theme, setTheme }) {
     const navigate = useNavigate();
     const location = useLocation();
     // View State: 'home' | 'create' | 'project'
@@ -414,21 +453,30 @@ function Dashboard({ user, onLogout }) {
             });
 
             if (resp.ok) {
+                const newMember = {
+                    id: member.id,
+                    name: member.name,
+                    email: member.email,
+                    initials: (member.name || 'U').charAt(0).toUpperCase(),
+                    status: 'online',
+                    color: 'var(--accent-dim)',
+                    role: 'Member'
+                };
+                
                 setProjects(prev => prev.map(p => {
                     if (p.id === projectId) {
-                        return {
-                            ...p,
-                            membersList: [...(p.membersList || []), {
-                                id: member.id,
-                                name: member.name,
-                                initials: (member.name || 'U').charAt(0).toUpperCase(),
-                                status: 'online',
-                                color: 'var(--accent-dim)'
-                            }]
-                        };
+                        return { ...p, membersList: [...(p.membersList || []), newMember] };
                     }
                     return p;
                 }));
+
+                // FIX: Update activeProject so the task edit dropdown sees the new person immediately!
+                if (activeProject && activeProject.id === projectId) {
+                    setActiveProject(prev => ({
+                        ...prev,
+                        membersList: [...(prev.membersList || []), newMember]
+                    }));
+                }
             }
         } catch (err) {
             console.error("Add member error:", err);
@@ -481,6 +529,13 @@ function Dashboard({ user, onLogout }) {
     const [selectionMode, setSelectionMode] = useState(false)
     const [selectedProjects, setSelectedProjects] = useState(new Set())
     const chatEndRef = useRef(null) // Scroll anchor
+
+    // State for editing tasks
+    const [editingTaskId, setEditingTaskId] = useState(null)
+    const [editTaskTitle, setEditTaskTitle] = useState('')
+    const [editTaskOwner, setEditTaskOwner] = useState('')
+    const [isCreatingTask, setIsCreatingTask] = useState(false)
+    const [newTaskTitle, setNewTaskTitle] = useState('')
 
     // Handle Join Project Link
     useEffect(() => {
@@ -667,22 +722,27 @@ function Dashboard({ user, onLogout }) {
                 if (resp.ok) {
                     const details = await resp.json();
                     
+                    let currentNotes = '';
+                    let currentSummaryText = '';
+                    
                     // The transcript is stored in the meetings list (latest first)
                     if (details.meetings && details.meetings.length > 0) {
                         const latestMeeting = details.meetings[0];
                         // Field from Go backend is Case-Sensitive (since no JSON tags in MeetingRow struct)
-                        const transcript = latestMeeting.TranscriptText || latestMeeting.transcript_text || "";
-                        setNotes(transcript);
-                        
-                        // If we have a summary from this meeting, load it too
-                        if (latestMeeting.SummaryText || latestMeeting.summary_text) {
-                            setSummary({
-                                summary: latestMeeting.SummaryText || latestMeeting.summary_text,
-                                decisions: [], // Future optimization
-                                action_items: details.tasks || []
-                            });
-                        }
+                        currentNotes = latestMeeting.TranscriptText || latestMeeting.transcript_text || "";
+                        currentSummaryText = latestMeeting.SummaryText || latestMeeting.summary_text || "";
                     }
+                    
+                    setNotes(currentNotes);
+                    
+                    // Load summary and tasks (Action Items)
+                    // This ensures tasks show up even if the summary string is empty,
+                    // and even if there are no meetings yet!
+                    setSummary({
+                        summary: currentSummaryText,
+                        decisions: [], // Future optimization
+                        action_items: details.tasks || []
+                    });
                     
                     // Update the project's membersList with fresh data
                     if (details.members && details.members.length > 0) {
@@ -747,39 +807,125 @@ function Dashboard({ user, onLogout }) {
                 return;
             }
 
-            if (!response.ok) {
-                throw new Error(`Update failed: ${response.statusText}`);
+            if (response.ok) {
+                const updatedActionItems = (summary?.action_items || []).map((item, index) =>
+                    index === taskIndex ? { ...item, status: newStatus } : item
+                );
+                const updatedSummary = { ...summary, action_items: updatedActionItems };
+                setSummary(updatedSummary);
+                setProjects(projects.map(p => p.id === activeProject.id ? { ...p, summary: updatedSummary } : p));
             }
 
-            // 2. Update Local State only if backend accepts
-            const updatedActionItems = (summary?.action_items || []).map((item, index) =>
-                index === taskIndex ? { ...item, status: newStatus } : item
-            );
-
-            const updatedSummary = { ...summary, action_items: updatedActionItems };
-            const newProgress = calculateProjectProgress(updatedSummary);
-            const newMembers = calculateProjectMembers(updatedSummary);
-
-            setSummary(updatedSummary);
-            setProjects(projects.map(p =>
-                p.id === activeProject.id ? {
-                    ...p,
-                    summary: updatedSummary,
-                    progress: newProgress,
-                    members: newMembers
-                } : p
-            ));
         } catch (error) {
             console.error("Error updating task status:", error);
-            alert("Failed to update task. Is the backend running?");
         }
-    }
+    };
+
+    const updateTaskDetail = async (taskIndex, newOwnerId, newTitle) => {
+        if (!activeProject || !summary) return;
+        const currentItems = summary?.action_items || activeProject?.summary?.action_items || [];
+        const task = currentItems[taskIndex];
+        
+        try {
+            const response = await fetch("http://localhost:5000/api/tasks/edit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    task_id: task.id,
+                    owner_id: newOwnerId,
+                    title: newTitle
+                })
+            });
+            
+            if (response.ok) {
+                const updatedTasks = [...currentItems];
+                // Lookup name from activeProject members OR from allUsers if they were just added
+                const foundInProject = activeProject.membersList?.find(m => m.id === newOwnerId);
+                const foundInAll = allUsers.find(u => u.id === newOwnerId);
+                const ownerName = foundInProject?.name || foundInAll?.name || 'Unassigned';
+                updatedTasks[taskIndex] = { 
+                    ...task, 
+                    owner_id: newOwnerId, 
+                    owner_name: ownerName,
+                    owner: ownerName,
+                    title: newTitle 
+                };
+                const newSummary = { ...summary, action_items: updatedTasks };
+                setSummary(newSummary);
+                setProjects(projects.map(p => p.id === activeProject.id ? { ...p, summary: newSummary } : p));
+                setEditingTaskId(null);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const updateProjectNotes = (id, newNotes) => {
         setProjects(projects.map(p =>
             p.id === id ? { ...p, notes: newNotes } : p
         ));
     }
+
+    const deleteTask = async (taskIndex) => {
+        if (!activeProject || !summary) return;
+        const currentItems = summary?.action_items || activeProject?.summary?.action_items || [];
+        const task = currentItems[taskIndex];
+        if (!window.confirm(`Delete task "${task.title}"?`)) return;
+
+        try {
+            const resp = await fetch("http://localhost:5000/api/tasks/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ task_id: task.id })
+            });
+
+            if (resp.ok) {
+                const updatedTasks = currentItems.filter((_, idx) => idx !== taskIndex);
+                const newSummary = { ...summary, action_items: updatedTasks };
+                setSummary(newSummary);
+                setProjects(projects.map(p => p.id === activeProject.id ? { ...p, summary: newSummary } : p));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleRemoveMemberFromProject = async (projectId, userId) => {
+        if (!window.confirm("Remove this member from the project?")) return;
+        try {
+            const resp = await fetch("http://localhost:5000/api/projects/members/remove", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ project_id: projectId.toString(), user_id: userId })
+            });
+            if (resp.ok) {
+                setProjects(prev => prev.map(p => {
+                    if (p.id === projectId) {
+                        return {
+                            ...p,
+                            membersList: (p.membersList || []).filter(m => m.id !== userId)
+                        };
+                    }
+                    return p;
+                }));
+                
+                // Update activeProject if it's the one we're looking at
+                if (activeProject && activeProject.id === projectId) {
+                    setActiveProject(prev => ({
+                        ...prev,
+                        membersList: (prev.membersList || []).filter(m => m.id !== userId)
+                    }));
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    useEffect(() => {
+        window.removeMember = handleRemoveMemberFromProject;
+        return () => { window.removeMember = null; };
+    }, [handleRemoveMemberFromProject]);
 
     const generateSummary = async () => {
         if (!notes) return;
@@ -788,7 +934,10 @@ function Dashboard({ user, onLogout }) {
             const response = await fetch(`http://localhost:5000/api/summary?user_id=${user.id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ notes })
+                body: JSON.stringify({ 
+                    notes, 
+                    project_id: activeProject?.id?.toString() 
+                })
             });
             const data = await response.json();
 
@@ -820,6 +969,66 @@ function Dashboard({ user, onLogout }) {
         }
     }
 
+    const handleCreateTask = async () => {
+        if (!activeProject || !newTaskTitle) return;
+        
+        try {
+            const resp = await fetch("http://localhost:5000/api/tasks/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    project_id: activeProject.id.toString(),
+                    title: newTaskTitle,
+                    description: "",
+                    owner_id: null
+                })
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                const freshTask = {
+                    id: data.id,
+                    title: newTaskTitle,
+                    status: 'todo',
+                    owner_name: 'Unassigned',
+                    owner_id: null,
+                    project: activeProject.name
+                };
+
+                const currentItems = summary?.action_items || activeProject?.summary?.action_items || [];
+                const updatedItems = [freshTask, ...currentItems];
+                const newSummary = { ...summary, action_items: updatedItems };
+                setSummary(newSummary);
+                setProjects(projects.map(p => p.id === activeProject.id ? { ...p, summary: newSummary } : p));
+                
+                // Reset
+                setIsCreatingTask(false);
+                setNewTaskTitle('');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleUpdateTaskWithAutoMember = async (taskIndex, newOwnerId, newTitle) => {
+        if (!activeProject || !summary) return;
+        
+        // 1. If owner is new, ask to add them to project first
+        if (newOwnerId && !activeProject.membersList.some(m => m.id === newOwnerId)) {
+            const userToAdd = allUsers.find(u => u.id === newOwnerId);
+            if (userToAdd) {
+                if (window.confirm(`${userToAdd.name} is not in this project yet. Add them and assign this task?`)) {
+                    await handleAddMember(activeProject.id, userToAdd);
+                } else {
+                    return; // Cancel assignment
+                }
+            }
+        }
+        
+        // 2. Perform the update
+        updateTaskDetail(taskIndex, newOwnerId, newTitle);
+    };
+
     const askQuestion = async () => {
         if (!question) return;
 
@@ -834,14 +1043,19 @@ function Dashboard({ user, onLogout }) {
             const response = await fetch("http://localhost:5000/api/ask", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question: currentQuestion })
+                body: JSON.stringify({ 
+                    question: currentQuestion,
+                    project_id: activeProject?.id?.toString()
+                })
             });
             const data = await response.json();
 
-            // Push AI response to chat history
+            // Push AI response to chat history (Structured)
             setChatHistory(prev => [...prev, {
                 role: 'ai',
-                text: data.answer,
+                answer: data.answer,
+                explanation: data.explanation,
+                action_items: data.action_items,
                 citation: data.citation
             }]);
             setAnswer(data);
@@ -1057,17 +1271,42 @@ function Dashboard({ user, onLogout }) {
                                                         padding: '1rem',
                                                         marginBottom: '1rem'
                                                     }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                                            <div className="user-avatar" style={{ width: '20px', height: '20px', fontSize: '0.65rem', border: 'none' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                                                            <div className="user-avatar" style={{ width: '20px', height: '20px', fontSize: '0.65rem', border: 'none', background: msg.role === 'user' ? 'var(--accent)' : '#8b5cf6' }}>
                                                                 {msg.role === 'user' ? 'U' : 'AI'}
                                                             </div>
                                                             <span style={{ fontWeight: 600, fontSize: '0.75rem', opacity: 0.7 }}>
                                                                 {msg.role === 'user' ? 'You' : 'MeetMint Bot'}
                                                             </span>
                                                         </div>
-                                                        {msg.text}
+                                                        
+                                                        {msg.answer ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                                <div style={{ fontSize: '1rem', fontWeight: 500, color: '#fff' }}>{msg.answer}</div>
+                                                                
+                                                                {msg.explanation && (
+                                                                    <div style={{ opacity: 0.8, fontSize: '0.85rem', lineHeight: '1.5', borderLeft: '2px solid rgba(255,255,255,0.1)', paddingLeft: '12px' }}>
+                                                                        {msg.explanation}
+                                                                    </div>
+                                                                )}
+
+                                                                {msg.action_items && msg.action_items.length > 0 && (
+                                                                    <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', opacity: 0.6, letterSpacing: '0.5px' }}>Action Items</div>
+                                                                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                            {msg.action_items.map((item, idx) => (
+                                                                                <li key={idx} style={{ opacity: 0.9 }}>{item}</li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            msg.text
+                                                        )}
+                                                        
                                                         {msg.citation && (
-                                                            <div className="bubble-citation" style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+                                                            <div className="bubble-citation" style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem', fontSize: '0.75rem', opacity: 0.4 }}>
                                                                 Source: {msg.citation}
                                                             </div>
                                                         )}
@@ -1160,34 +1399,177 @@ function Dashboard({ user, onLogout }) {
                                                     <h3 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Action Items</h3>
                                                     <div className="vertical-divider" style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }}></div>
                                                     <div style={{ position: 'relative' }}>
-                                                        <MemberStack project={activeProject} onAddMember={handleAddMember} showAdd={true} centered={true} />
+                                                        <MemberStack 
+                                                            project={activeProject} 
+                                                            onAddMember={handleAddMember} 
+                                                            onRemoveMember={handleRemoveMemberFromProject}
+                                                            showAdd={true} 
+                                                            centered={true} 
+                                                        />
                                                     </div>
                                                 </div>
-                                                <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>{(summary?.action_items || activeProject?.summary?.action_items || []).length} total</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>{(summary?.action_items || activeProject?.summary?.action_items || []).length} total</div>
+                                                    <button 
+                                                        className="glass-btn-secondary" 
+                                                        onClick={() => setIsCreatingTask(true)}
+                                                        style={{ padding: '6px 12px', fontSize: '0.8rem', background: 'rgba(59, 130, 246, 0.1)' }}
+                                                    >
+                                                        + New Task
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="glass-task-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                                {isCreatingTask && (
+                                                    <div className="ultra-card editing" style={{ padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                    <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Create New Task</label>
+                                                                    <span style={{ fontSize: '0.7rem', opacity: 0.4 }}>Press Enter to save</span>
+                                                                </div>
+                                                                <input 
+                                                                    className="glass-text-input"
+                                                                    value={newTaskTitle}
+                                                                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                                    placeholder="Type something that needs to be done..."
+                                                                    autoFocus
+                                                                    onKeyDown={(e) => {
+                                                                        if(e.key === 'Enter') handleCreateTask();
+                                                                        if(e.key === 'Escape') setIsCreatingTask(false);
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                                <button className="glass-btn-action" onClick={handleCreateTask}>Create Task</button>
+                                                                <button className="glass-btn-secondary" onClick={() => setIsCreatingTask(false)}>Cancel</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {(summary?.action_items || activeProject?.summary?.action_items || []).map((t, i) => (
-                                                    <div key={i} className={`ultra-card ${t.owner_id !== user.id ? 'read-only' : ''}`} style={{
+                                                    <div key={t.id || `task-${i}`} className={`ultra-card ${t.owner_id !== user?.id && t.owner_id ? 'read-only' : ''}`} style={{
                                                         padding: '1.25rem 1.5rem',
                                                         background: 'rgba(255,255,255,0.02)'
                                                     }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                    <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#fff' }}>{t.title}</span>
-                                                                    {t.owner_id !== user.id && <span title="Read Only" style={{ fontSize: '0.85rem', opacity: 0.5 }}>🔒</span>}
-                                                                </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                        <div className="user-avatar" style={{ width: '22px', height: '22px', fontSize: '0.7rem', border: 'none' }}>
-                                                                            {(t.owner || 'U').charAt(0).toUpperCase()}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                                                                {editingTaskId === (t.id || `task-${i}`) ? (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                                        <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Task Description</label>
+                                                                        <input 
+                                                                            className="glass-text-input"
+                                                                            value={editTaskTitle}
+                                                                            onChange={(e) => setEditTaskTitle(e.target.value)}
+                                                                            style={{ padding: '8px', fontSize: '1rem', width: '90%' }}
+                                                                            placeholder="What needs to be done?"
+                                                                        />
+                                                                        
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                            <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Assign To</label>
+                                                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                                                <select 
+                                                                                    className="task-status-select"
+                                                                                    value={editTaskOwner}
+                                                                                    onChange={(e) => setEditTaskOwner(e.target.value)}
+                                                                                    style={{ background: 'rgba(255,255,255,0.1)', padding: '5px 10px', flex: 1 }}
+                                                                                >
+                                                                                    <option value="">Unassigned</option>
+                                                                                    {/* Show current project members first */}
+                                                                                    <optgroup label="Project Members">
+                                                                                        {allUsers.filter(u => activeProject.membersList?.some(m => m.id === u.id)).map(m => (
+                                                                                            <option key={m.id} value={m.id}>{m.name} (Member)</option>
+                                                                                        ))}
+                                                                                    </optgroup>
+                                                                                    {/* Show other team members */}
+                                                                                    <optgroup label="Other Team Members">
+                                                                                        {allUsers.filter(u => !activeProject.membersList?.some(m => m.id === u.id)).map(m => (
+                                                                                            <option key={m.id} value={m.id}>{m.name} (Add to Project)</option>
+                                                                                        ))}
+                                                                                    </optgroup>
+                                                                                </select>
+                                                                                <button 
+                                                                                    className="glass-btn-secondary" 
+                                                                                    onClick={(e) => {
+                                                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                                                        setPanelAnchor(rect);
+                                                                                    }}
+                                                                                    style={{ padding: '4px 8px', fontSize: '0.7rem', whiteSpace: 'nowrap' }}
+                                                                                >
+                                                                                    + Add Team Member
+                                                                                </button>
+                                                                            </div>
+                                                                            {(!activeProject.membersList || activeProject.membersList.length === 0) && (
+                                                                                <span style={{ fontSize: '0.7rem', color: '#60a5fa' }}>Tip: Add members to the project first to assign them here.</span>
+                                                                            )}
                                                                         </div>
-                                                                        <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>{t.owner || 'Unassigned'}</span>
+
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                                                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                                                <button 
+                                                                                    className="glass-btn-action" 
+                                                                                    onClick={() => handleUpdateTaskWithAutoMember(i, editTaskOwner, editTaskTitle)}
+                                                                                    style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                                                                                >
+                                                                                    Save Changes
+                                                                                </button>
+                                                                                <button 
+                                                                                    className="glass-btn-secondary" 
+                                                                                    onClick={() => setEditingTaskId(null)}
+                                                                                    style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </div>
+                                                                            <button 
+                                                                                onClick={() => deleteTask(i)}
+                                                                                style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', color: '#ef4444', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer' }}
+                                                                            >
+                                                                                Delete Task
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
-                                                                    <span style={{ fontSize: '0.85rem', opacity: 0.4 }}>•</span>
-                                                                    <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>Due: {t.due}</span>
-                                                                </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                            <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#fff' }}>{t.title}</span>
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    setEditingTaskId(t.id || `task-${i}`);
+                                                                                    setEditTaskTitle(t.title);
+                                                                                    setEditTaskOwner(t.owner_id || '');
+                                                                                }}
+                                                                                style={{ 
+                                                                                    background: 'rgba(59, 130, 246, 0.1)', 
+                                                                                    border: '1px solid rgba(59, 130, 246, 0.2)', 
+                                                                                    color: '#60a5fa', 
+                                                                                    fontSize: '0.75rem', 
+                                                                                    cursor: 'pointer', 
+                                                                                    padding: '2px 8px',
+                                                                                    borderRadius: '4px'
+                                                                                }}
+                                                                            >
+                                                                                Edit Task & Assignee
+                                                                            </button>
+                                                                            {t.owner_id !== user?.id && t.owner_id && (
+                                                                                <span title="Read Only" style={{ fontSize: '0.85rem', opacity: 0.5 }}>🔒</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                <div className="user-avatar" style={{ width: '22px', height: '22px', fontSize: '0.7rem', border: 'none' }}>
+                                                                                    {(t.owner_name || t.owner || 'U').charAt(0).toUpperCase()}
+                                                                                </div>
+                                                                                <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>
+                                                                                    {t.owner_name || t.owner || 'Unassigned'}
+                                                                                </span>
+                                                                            </div>
+                                                                            <span style={{ fontSize: '0.85rem', opacity: 0.4 }}>•</span>
+                                                                            <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>Due: {t.due_date || t.due || 'No date'}</span>
+                                                                        </div>
+                                                                    </>
+                                                                )}
                                                             </div>
 
                                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
@@ -1198,7 +1580,6 @@ function Dashboard({ user, onLogout }) {
                                                                     className="task-status-select"
                                                                     value={t.status || 'todo'}
                                                                     onChange={(e) => updateTaskStatus(i, e.target.value)}
-                                                                    disabled={t.owner_id !== user.id}
                                                                     style={{
                                                                         background: 'rgba(255,255,255,0.08)',
                                                                         border: 'none',
@@ -1345,7 +1726,7 @@ function Dashboard({ user, onLogout }) {
                                             </div>
 
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
-                                                <MemberStack project={project} onAddMember={handleAddMember} showAdd={false} />
+                                                <MemberStack project={project} onAddMember={handleAddMember} onRemoveMember={handleRemoveMemberFromProject} showAdd={false} />
                                                 <div className="task-count-badge" style={{
                                                     background: 'rgba(59, 130, 246, 0.1)',
                                                     padding: '4px 10px',
@@ -1427,10 +1808,12 @@ function Dashboard({ user, onLogout }) {
                                         <div key={i} className="ultra-card" style={{ padding: '1.25rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                    <div className="user-avatar" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>{t.owner ? t.owner[0].toUpperCase() : '?'}</div>
+                                                    <div className="user-avatar" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>
+                                                        {(t.owner_name || t.owner || '?')[0].toUpperCase()}
+                                                    </div>
                                                     <div>
                                                         <div style={{ fontWeight: 600 }}>{t.title}</div>
-                                                        <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>Project: {t.project} • Owner: {t.owner || 'Unassigned'}</div>
+                                                        <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>Project: {t.project} • Owner: {t.owner_name || t.owner || 'Unassigned'}</div>
                                                     </div>
                                                 </div>
                                                 <span className={`capsule-badge ${t.status || 'todo'}`}>{t.status || 'todo'}</span>

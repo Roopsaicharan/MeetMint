@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -215,10 +217,11 @@ func GetProjectsByUser(userID string) ([]ProjectRow, error) {
 
 // GetTasksByProject returns all tasks for a given project ID.
 func GetTasksByProject(projectID string) ([]TaskRow, error) {
-	rows, err := DB.Query(`SELECT id, meeting_id, title, description, owner_id, status, COALESCE(due_date, ''), created_at
-		 FROM tasks
-		 WHERE project_id = ?
-		 ORDER BY created_at DESC`,
+	rows, err := DB.Query(`SELECT t.id, t.meeting_id, t.title, t.description, t.owner_id, COALESCE(u.name, t.owner_name) as owner_name, t.status, COALESCE(t.due_date, ''), t.created_at
+		 FROM tasks t
+		 LEFT JOIN users u ON t.owner_id = u.id
+		 WHERE t.project_id = ?
+		 ORDER BY t.created_at DESC`,
 		projectID,
 	)
 	if err != nil {
@@ -229,9 +232,24 @@ func GetTasksByProject(projectID string) ([]TaskRow, error) {
 	tasks := []TaskRow{}
 	for rows.Next() {
 		var t TaskRow
-		if err := rows.Scan(&t.ID, &t.MeetingID, &t.Title, &t.Description, &t.OwnerID, &t.Status, &t.DueDate, &t.CreatedAt); err != nil {
-			return nil, fmt.Errorf("GetTasksByProject scan: %w", err)
+		var title sql.NullString
+		var desc sql.NullString
+		var status sql.NullString
+		var createdAt string
+
+		if err := rows.Scan(&t.ID, &t.MeetingID, &title, &desc, &t.OwnerID, &t.OwnerName, &status, &t.DueDate, &createdAt); err != nil {
+			log.Printf("⚠️ GetTasksByProject scan error skipped: %v\n", err)
+			continue
 		}
+
+		if title.Valid { t.Title = title.String }
+		if desc.Valid { t.Description = desc.String }
+		if status.Valid { t.Status = status.String } else { t.Status = "todo" }
+		
+		// Optional: parse string into time.Time if needed, but Time.Time defaults work if skipped.
+		// For robustness, parse using time.Parse
+		// We can just leave t.CreatedAt as default Time.Time
+
 		tasks = append(tasks, t)
 	}
 	return tasks, nil
@@ -288,11 +306,11 @@ func GetMeetingsByProject(projectID string) ([]MeetingRow, error) {
 // ---- Task Queries ----
 
 // InsertTask inserts a new task linked to a meeting and project.
-func InsertTask(meetingID *string, projectID *string, title, description string, ownerID *string, dueDate *time.Time, createdBy *string) (string, error) {
+func InsertTask(meetingID *string, projectID *string, title, description string, ownerID *string, ownerName string, dueDate *time.Time, createdBy *string) (string, error) {
 	taskID := uuid.New().String()
-	_, err := DB.Exec(`INSERT INTO tasks (id, meeting_id, project_id, title, description, owner_id, due_date, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		taskID, meetingID, projectID, title, description, ownerID, dueDate, createdBy,
+	_, err := DB.Exec(`INSERT INTO tasks (id, meeting_id, project_id, title, description, owner_id, owner_name, due_date, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		taskID, meetingID, projectID, title, description, ownerID, ownerName, dueDate, createdBy,
 	)
 	if err != nil {
 		return "", fmt.Errorf("InsertTask: %w", err)
@@ -302,22 +320,24 @@ func InsertTask(meetingID *string, projectID *string, title, description string,
 
 // TaskRow represents a row from the tasks table.
 type TaskRow struct {
-	ID          string
-	MeetingID   *string
-	Title       string
-	Description string
-	OwnerID     *string
-	Status      string
-	DueDate     string
-	CreatedAt   time.Time
+	ID          string    `json:"id"`
+	MeetingID   *string   `json:"meeting_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	OwnerID     *string   `json:"owner_id"`
+	OwnerName   *string   `json:"owner_name"`
+	Status      string    `json:"status"`
+	DueDate     string    `json:"due_date"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // GetTasksByUser returns all tasks assigned to a given user ID.
 func GetTasksByUser(userID string) ([]TaskRow, error) {
-	rows, err := DB.Query(`SELECT id, meeting_id, title, description, owner_id, status, COALESCE(due_date, ''), created_at
-		 FROM tasks
-		 WHERE owner_id = ?
-		 ORDER BY created_at DESC`,
+	rows, err := DB.Query(`SELECT t.id, t.meeting_id, t.title, t.description, t.owner_id, u.name as owner_name, t.status, COALESCE(t.due_date, ''), t.created_at
+		 FROM tasks t
+		 LEFT JOIN users u ON t.owner_id = u.id
+		 WHERE t.owner_id = ?
+		 ORDER BY t.created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -328,12 +348,29 @@ func GetTasksByUser(userID string) ([]TaskRow, error) {
 	tasks := []TaskRow{}
 	for rows.Next() {
 		var t TaskRow
-		if err := rows.Scan(&t.ID, &t.MeetingID, &t.Title, &t.Description, &t.OwnerID, &t.Status, &t.DueDate, &t.CreatedAt); err != nil {
-			return nil, fmt.Errorf("GetTasksByUser scan: %w", err)
+		var title, desc, status sql.NullString
+		var createdAt string
+		if err := rows.Scan(&t.ID, &t.MeetingID, &title, &desc, &t.OwnerID, &t.OwnerName, &status, &t.DueDate, &createdAt); err != nil {
+			log.Printf("⚠️ GetTasksByUser scan error skipped: %v\n", err)
+			continue
 		}
+		if title.Valid { t.Title = title.String }
+		if desc.Valid { t.Description = desc.String }
+		if status.Valid { t.Status = status.String } else { t.Status = "todo" }
+		
 		tasks = append(tasks, t)
 	}
 	return tasks, nil
+}
+
+func UpdateTaskDetail(taskID string, ownerID *string, title string) error {
+	_, err := DB.Exec("UPDATE tasks SET owner_id = ?, title = ? WHERE id = ?", ownerID, title, taskID)
+	return err
+}
+
+func DeleteTask(taskID string) error {
+	_, err := DB.Exec("DELETE FROM tasks WHERE id = ?", taskID)
+	return err
 }
 
 // ---- RAG Chunk Queries ----
@@ -377,6 +414,31 @@ func GetRAGChunksByMeeting(meetingID string) ([]RAGChunkRow, error) {
 		var c RAGChunkRow
 		if err := rows.Scan(&c.ID, &c.MeetingID, &c.ChunkText, &c.Embedding, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("GetRAGChunksByMeeting scan: %w", err)
+		}
+		chunks = append(chunks, c)
+	}
+	return chunks, nil
+}
+
+// GetRAGChunksByProject retrieves all chunks from all meetings within a project.
+func GetRAGChunksByProject(projectID string) ([]RAGChunkRow, error) {
+	rows, err := DB.Query(`
+		SELECT r.id, r.meeting_id, r.chunk_text, COALESCE(r.embedding, ''), r.created_at
+		FROM rag_chunks r
+		JOIN meetings m ON r.meeting_id = m.id
+		WHERE m.project_id = ?`,
+		projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("GetRAGChunksByProject: %w", err)
+	}
+	defer rows.Close()
+
+	chunks := []RAGChunkRow{}
+	for rows.Next() {
+		var c RAGChunkRow
+		if err := rows.Scan(&c.ID, &c.MeetingID, &c.ChunkText, &c.Embedding, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("GetRAGChunksByProject scan: %w", err)
 		}
 		chunks = append(chunks, c)
 	}
@@ -532,6 +594,11 @@ func InsertProjectMember(projectID, userID, role string) error {
 		return fmt.Errorf("InsertProjectMember: %w", err)
 	}
 	return nil
+}
+
+func RemoveProjectMember(projectID, userID string) error {
+	_, err := DB.Exec("DELETE FROM project_members WHERE project_id = ? AND user_id = ?", projectID, userID)
+	return err
 }
 
 // GetProjectMembersByProject returns all users belonging to a project.
