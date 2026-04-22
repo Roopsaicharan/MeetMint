@@ -10,7 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DB is the global database connection pool.
+// DB is the global database connection pool. 
 var DB *sql.DB
 
 // InitDB initializes the SQLite database.
