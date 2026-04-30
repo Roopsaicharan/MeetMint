@@ -110,7 +110,7 @@ const ProcessingScreen = ({ fileName, projectName, dueDate, fileSize, duration, 
                             <input type="text" placeholder="Search..." />
                         </div>
                         <div className="user-avatar" style={{ border: 'none' }}>
-                            <img src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(JSON.parse(localStorage.getItem('meetmint_user') || '{}')?.name || JSON.parse(localStorage.getItem('meetmint_user') || '{}')?.email || 'User')}&background=random`} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
                         </div>
                         <button className="dash-logout" onClick={onCancel}>Cancel</button>
                     </div>

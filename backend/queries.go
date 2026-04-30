@@ -363,8 +363,8 @@ func GetTasksByUser(userID string) ([]TaskRow, error) {
 	return tasks, nil
 }
 
-func UpdateTaskDetail(taskID string, ownerID *string, title string) error {
-	_, err := DB.Exec("UPDATE tasks SET owner_id = ?, title = ? WHERE id = ?", ownerID, title, taskID)
+func UpdateTaskDetail(taskID string, ownerID *string, title string, dueDate *string) error {
+	_, err := DB.Exec("UPDATE tasks SET owner_id = ?, title = ?, due_date = ? WHERE id = ?", ownerID, title, dueDate, taskID)
 	return err
 }
 
@@ -672,4 +672,90 @@ func GetProcessingJob(projectID string) (ProcessingJob, error) {
 		projectID,
 	).Scan(&j.ID, &j.ProjectID, &j.Status, &j.Progress, &j.CurrentStep, &j.ETASeconds, &j.ErrorMessage, &j.StartedAt, &j.CompletedAt)
 	return j, err
+}
+
+// ---- Meeting Image Queries ----
+
+type MeetingImageRow struct {
+	ID        string    `json:"id"`
+	MeetingID string    `json:"meeting_id"`
+	ProjectID string    `json:"project_id"`
+	Filename  string    `json:"filename"`
+	MimeType  string    `json:"mime_type"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// InsertMeetingImage stores an image blob associated with a meeting.
+func InsertMeetingImage(meetingID, projectID, filename, mimeType string, data []byte) (string, error) {
+	imageID := uuid.New().String()
+	_, err := DB.Exec(
+		`INSERT INTO meeting_images (id, meeting_id, project_id, filename, data, mime_type) VALUES (?, ?, ?, ?, ?, ?)`,
+		imageID, meetingID, projectID, filename, data, mimeType,
+	)
+	if err != nil {
+		return "", fmt.Errorf("InsertMeetingImage: %w", err)
+	}
+	return imageID, nil
+}
+
+// GetMeetingImagesByProject returns metadata (no blob) for images in a project.
+func GetMeetingImagesByProject(projectID string) ([]MeetingImageRow, error) {
+	rows, err := DB.Query(
+		`SELECT id, COALESCE(meeting_id, ''), project_id, filename, mime_type, created_at
+		 FROM meeting_images WHERE project_id = ? ORDER BY created_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("GetMeetingImagesByProject: %w", err)
+	}
+	defer rows.Close()
+
+	images := []MeetingImageRow{}
+	for rows.Next() {
+		var img MeetingImageRow
+		if err := rows.Scan(&img.ID, &img.MeetingID, &img.ProjectID, &img.Filename, &img.MimeType, &img.CreatedAt); err != nil {
+			log.Printf("⚠️ GetMeetingImagesByProject scan error: %v\n", err)
+			continue
+		}
+		images = append(images, img)
+	}
+	return images, nil
+}
+
+// GetMeetingImageData retrieves the raw image blob by ID.
+func GetMeetingImageData(imageID string) ([]byte, string, error) {
+	var data []byte
+	var mimeType string
+	err := DB.QueryRow(`SELECT data, mime_type FROM meeting_images WHERE id = ?`, imageID).Scan(&data, &mimeType)
+	if err != nil {
+		return nil, "", fmt.Errorf("GetMeetingImageData: %w", err)
+	}
+	return data, mimeType, nil
+}
+
+// DeleteMeetingImage removes a single image.
+func DeleteMeetingImage(imageID string) error {
+	_, err := DB.Exec(`DELETE FROM meeting_images WHERE id = ?`, imageID)
+	return err
+}
+
+// ---- Transcript Update ----
+
+// UpdateMeetingTranscript updates the transcript text for a meeting.
+func UpdateMeetingTranscript(meetingID, transcriptText string) error {
+	_, err := DB.Exec(`UPDATE meetings SET transcript_text = ? WHERE id = ?`, transcriptText, meetingID)
+	if err != nil {
+		return fmt.Errorf("UpdateMeetingTranscript: %w", err)
+	}
+	return nil
+}
+
+// GetLatestMeetingIDByProject returns the most recent meeting ID for a project.
+func GetLatestMeetingIDByProject(projectID string) (string, error) {
+	var meetingID string
+	err := DB.QueryRow(`SELECT id FROM meetings WHERE project_id = ? ORDER BY created_at DESC LIMIT 1`, projectID).Scan(&meetingID)
+	if err != nil {
+		return "", fmt.Errorf("GetLatestMeetingIDByProject: %w", err)
+	}
+	return meetingID, nil
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/rs/cors"
 )
 
-// Data structs           
+// Data structs     
 type SummaryResponse struct {
 	Summary     string       `json:"summary"`
 	Decisions   []string     `json:"decisions"`
@@ -70,6 +70,7 @@ type UpdateTaskDetailRequest struct {
 	TaskID  string  `json:"task_id"`
 	OwnerID *string `json:"owner_id"`
 	Title   string  `json:"title"`
+	DueDate *string `json:"due_date"`
 }
 
 type ForgotPasswordRequest struct {
@@ -114,6 +115,8 @@ func main() {
 		AllowedOrigins: []string{
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
+			"http://localhost:5174",
+			"http://127.0.0.1:5174",
 			"https://meet-mint.vercel.app",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -167,6 +170,15 @@ func SetupRouter() *http.ServeMux {
 
 	// 5. User Endpoints
 	mux.HandleFunc("/api/users/search", handleSearchUsers)
+
+	// 6. Meeting Image Endpoints (Sprint 4)
+	mux.HandleFunc("/api/images/upload", handleUploadImage)
+	mux.HandleFunc("/api/images/", handleServeImage)  // serves /api/images/{id}
+	mux.HandleFunc("/api/images/delete", handleDeleteImage)
+	mux.HandleFunc("/api/images/list", handleListImages)
+
+	// 7. Transcript Editor (Sprint 4)
+	mux.HandleFunc("/api/transcript/update", handleUpdateTranscript)
 
 	// Register job status endpoints (from job_endpoints.go)
 	RegisterJobEndpoints(mux)
@@ -688,12 +700,17 @@ func handleProjectDetails(w http.ResponseWriter, r *http.Request) {
 	meetings, _ := GetMeetingsByProject(pid)
 	tasks, _ := GetTasksByProject(pid)
 	members, _ := GetProjectMembersByProject(pid)
+	images, _ := GetMeetingImagesByProject(pid)
+	if images == nil {
+		images = []MeetingImageRow{}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"meetings": meetings,
 		"tasks":    tasks,
 		"members":  members,
+		"images":   images,
 	})
 }
 
@@ -722,7 +739,7 @@ func handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := UpdateTaskDetail(req.TaskID, req.OwnerID, req.Title)
+	err := UpdateTaskDetail(req.TaskID, req.OwnerID, req.Title, req.DueDate)
 	if err != nil {
 		log.Printf("❌ Failed to update task detail: %v", err)
 		http.Error(w, "Update failed", http.StatusInternalServerError)
@@ -830,6 +847,139 @@ func handleInviteMember(w http.ResponseWriter, r *http.Request) {
 		InsertProjectMember(req.ProjectID, uid, "member")
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// ---- Sprint 4: Image Handlers ----
+
+func handleUploadImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form (max 10MB per image)
+	r.ParseMultipartForm(10 << 20)
+
+	projectID := r.FormValue("project_id")
+	if projectID == "" {
+		http.Error(w, "project_id is required", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "No image file provided", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Failed to read image", http.StatusInternalServerError)
+		return
+	}
+
+	// Detect MIME type
+	mimeType := http.DetectContentType(data)
+	if !strings.HasPrefix(mimeType, "image/") {
+		http.Error(w, "File is not an image", http.StatusBadRequest)
+		return
+	}
+
+	// Get (or create) the latest meeting for this project
+	meetingID, err := GetLatestMeetingIDByProject(projectID)
+	if err != nil {
+		// No meeting yet — create a placeholder
+		meetingID, _ = InsertMeeting(&projectID, "", "")
+	}
+
+	imageID, err := InsertMeetingImage(meetingID, projectID, header.Filename, mimeType, data)
+	if err != nil {
+		log.Printf("❌ Failed to save image: %v", err)
+		http.Error(w, "Failed to save image", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("📷 Image uploaded: %s (%s) for project %s", header.Filename, imageID, projectID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": imageID, "filename": header.Filename})
+}
+
+func handleServeImage(w http.ResponseWriter, r *http.Request) {
+	// Extract image ID from path: /api/images/{id}
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Image ID required", http.StatusBadRequest)
+		return
+	}
+	imageID := parts[len(parts)-1]
+
+	data, mimeType, err := GetMeetingImageData(imageID)
+	if err != nil {
+		http.Error(w, "Image not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(data)
+}
+
+func handleDeleteImage(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ImageID string `json:"image_id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if err := DeleteMeetingImage(req.ImageID); err != nil {
+		http.Error(w, "Failed to delete image", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("🗑️ Image deleted: %s", req.ImageID)
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleListImages(w http.ResponseWriter, r *http.Request) {
+	projectID := r.URL.Query().Get("project_id")
+	images, err := GetMeetingImagesByProject(projectID)
+	if err != nil {
+		images = []MeetingImageRow{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(images)
+}
+
+// ---- Sprint 4: Transcript Editor Handler ----
+
+func handleUpdateTranscript(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProjectID  string `json:"project_id"`
+		Transcript string `json:"transcript"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	meetingID, err := GetLatestMeetingIDByProject(req.ProjectID)
+	if err != nil {
+		http.Error(w, "No meeting found for this project", http.StatusNotFound)
+		return
+	}
+
+	if err := UpdateMeetingTranscript(meetingID, req.Transcript); err != nil {
+		log.Printf("❌ Failed to update transcript: %v", err)
+		http.Error(w, "Update failed", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("📝 Transcript updated for project %s (meeting %s)", req.ProjectID, meetingID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Transcript saved successfully"})
 }
 
 func handleDeleteProject(w http.ResponseWriter, r *http.Request) {

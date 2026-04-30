@@ -534,8 +534,19 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
     const [editingTaskId, setEditingTaskId] = useState(null)
     const [editTaskTitle, setEditTaskTitle] = useState('')
     const [editTaskOwner, setEditTaskOwner] = useState('')
+    const [editTaskDueDate, setEditTaskDueDate] = useState('')
     const [isCreatingTask, setIsCreatingTask] = useState(false)
     const [newTaskTitle, setNewTaskTitle] = useState('')
+
+    // Sprint 4: Transcript Editor & Image Upload
+    const [isEditingTranscript, setIsEditingTranscript] = useState(false)
+    const [editedTranscript, setEditedTranscript] = useState('')
+    const [savingTranscript, setSavingTranscript] = useState(false)
+    const [transcriptSaveMsg, setTranscriptSaveMsg] = useState('')
+    const [meetingImages, setMeetingImages] = useState([])
+    const [uploadingImage, setUploadingImage] = useState(false)
+    const [lightboxImage, setLightboxImage] = useState(null)
+    const imageInputRef = useRef(null)
 
     // Handle Join Project Link
     useEffect(() => {
@@ -734,6 +745,12 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                     }
                     
                     setNotes(currentNotes);
+                    setEditedTranscript(currentNotes);
+                    setIsEditingTranscript(false);
+                    setTranscriptSaveMsg('');
+                    
+                    // Load meeting images
+                    setMeetingImages(details.images || []);
                     
                     // Load summary and tasks (Action Items)
                     // This ensures tasks show up even if the summary string is empty,
@@ -821,7 +838,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
         }
     };
 
-    const updateTaskDetail = async (taskIndex, newOwnerId, newTitle) => {
+    const updateTaskDetail = async (taskIndex, newOwnerId, newTitle, newDueDate) => {
         if (!activeProject || !summary) return;
         const currentItems = summary?.action_items || activeProject?.summary?.action_items || [];
         const task = currentItems[taskIndex];
@@ -833,7 +850,8 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                 body: JSON.stringify({
                     task_id: task.id,
                     owner_id: newOwnerId,
-                    title: newTitle
+                    title: newTitle,
+                    due_date: newDueDate || null
                 })
             });
             
@@ -848,7 +866,8 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                     owner_id: newOwnerId, 
                     owner_name: ownerName,
                     owner: ownerName,
-                    title: newTitle 
+                    title: newTitle,
+                    due_date: newDueDate
                 };
                 const newSummary = { ...summary, action_items: updatedTasks };
                 setSummary(newSummary);
@@ -1010,7 +1029,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
         }
     };
 
-    const handleUpdateTaskWithAutoMember = async (taskIndex, newOwnerId, newTitle) => {
+    const handleUpdateTaskWithAutoMember = async (taskIndex, newOwnerId, newTitle, newDueDate) => {
         if (!activeProject || !summary) return;
         
         // 1. If owner is new, ask to add them to project first
@@ -1026,7 +1045,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
         }
         
         // 2. Perform the update
-        updateTaskDetail(taskIndex, newOwnerId, newTitle);
+        updateTaskDetail(taskIndex, newOwnerId, newTitle, newDueDate);
     };
 
     const askQuestion = async () => {
@@ -1091,56 +1110,155 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                 <div className="search-box">
                                     <input type="text" placeholder="Search..." />
                                 </div>
-                                <div className="user-avatar">R</div>
+                                <div className="user-avatar">{(user?.name || user?.email || 'U').charAt(0).toUpperCase()}</div>
                                 <button className="glass-btn-secondary" onClick={() => setView('home')}>Cancel</button>
                             </div>
                         </div>
                     </header>
 
                     <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '3rem 2rem' }}>
-                        <section className="glass-section">
-                            <div className="section-header">
-                                <h3>Start New Project</h3>
-                            </div>
-                            <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                                <label className="glass-label">Project Name</label>
-                                <input
-                                    type="text"
-                                    className="glass-text-input"
-                                    placeholder="e.g. Sprint 2 Review"
-                                    value={newProjectName}
-                                    onChange={(e) => setNewProjectName(e.target.value)}
-                                />
+                        <section className="glass-section create-project-card" style={{ maxWidth: '680px', margin: '0 auto' }}>
+                            <div className="section-header" style={{ marginBottom: '2rem' }}>
+                                <h3 style={{ fontSize: '1.5rem' }}>Start New Project</h3>
                             </div>
 
-                            <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                                <label className="glass-label">Due Date (for tracking)</label>
-                                <input
-                                    type="date"
-                                    className="glass-text-input"
-                                    value={newProjectDate}
-                                    onChange={(e) => setNewProjectDate(e.target.value)}
-                                />
-                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                {/* Project Name */}
+                                <div className="dash-input-group">
+                                    <label className="glass-label">Project Name</label>
+                                    <input
+                                        type="text"
+                                        className="glass-text-input"
+                                        placeholder="e.g. Sprint 2 Review"
+                                        value={newProjectName}
+                                        onChange={(e) => setNewProjectName(e.target.value)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
 
-                            <div className="dash-input-group" style={{ marginBottom: '20px' }}>
-                                <label className="glass-label">Upload Meeting Video</label>
-                                <input
-                                    type="file"
-                                    accept="video/*"
-                                    onChange={handleVideoChange}
-                                    className="dash-file-input"
-                                />
-                            </div>
+                                {/* Due Date */}
+                                <div className="dash-input-group">
+                                    <label className="glass-label">📅 Due Date (for tracking)</label>
+                                    <input
+                                        type="date"
+                                        className="glass-text-input"
+                                        value={newProjectDate}
+                                        onChange={(e) => setNewProjectDate(e.target.value)}
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
 
-                            <button
-                                onClick={handleCreateProject}
-                                disabled={loadingVideo || !videoFile || !newProjectName || !newProjectDate}
-                                className="glass-btn-action"
-                                style={{ width: '100%' }}
-                            >
-                                {loadingVideo ? 'Processing & Analyzing...' : 'Create Project'}
-                            </button>
+                                {/* Upload Meeting Video - Styled Drop Zone */}
+                                <div className="dash-input-group">
+                                    <label className="glass-label">🎬 Upload Meeting Video</label>
+                                    <div
+                                        className="file-upload-zone"
+                                        onClick={() => document.getElementById('video-file-input').click()}
+                                        style={{
+                                            width: '100%',
+                                            padding: videoFile ? '1.25rem 1.5rem' : '2.5rem 1.5rem',
+                                            borderRadius: '14px',
+                                            border: videoFile
+                                                ? '2px solid rgba(34, 197, 94, 0.4)'
+                                                : '2px dashed rgba(96, 165, 250, 0.3)',
+                                            background: videoFile
+                                                ? 'rgba(34, 197, 94, 0.06)'
+                                                : 'rgba(15, 23, 42, 0.4)',
+                                            cursor: 'pointer',
+                                            textAlign: 'center',
+                                            transition: 'all 0.3s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!videoFile) {
+                                                e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.5)';
+                                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!videoFile) {
+                                                e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.3)';
+                                                e.currentTarget.style.background = 'rgba(15, 23, 42, 0.4)';
+                                            }
+                                        }}
+                                    >
+                                        {videoFile ? (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                                                    <div style={{
+                                                        width: '44px', height: '44px', borderRadius: '12px',
+                                                        background: 'rgba(34, 197, 94, 0.15)',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '1.3rem', flexShrink: 0
+                                                    }}>
+                                                        🎥
+                                                    </div>
+                                                    <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                                                        <div style={{
+                                                            fontWeight: 600, color: '#fff', fontSize: '0.95rem',
+                                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {videoFile.name}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '2px' }}>
+                                                            {(videoFile.size / (1024 * 1024)).toFixed(1)} MB • Click to change
+                                                        </div>
+                                                    </div>
+                                                    <div style={{
+                                                        width: '28px', height: '28px', borderRadius: '50%',
+                                                        background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '0.9rem', flexShrink: 0
+                                                    }}>
+                                                        ✓
+                                                    </div>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div style={{ fontSize: '2.2rem', opacity: 0.5 }}>📁</div>
+                                                <div style={{ fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem' }}>
+                                                    Click to select a meeting video
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', opacity: 0.4 }}>
+                                                    Supports MP4, MOV, AVI, WEBM
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                    <input
+                                        id="video-file-input"
+                                        type="file"
+                                        accept="video/*"
+                                        onChange={handleVideoChange}
+                                        style={{ display: 'none' }}
+                                    />
+                                </div>
+
+                                {/* Create Button */}
+                                <button
+                                    onClick={handleCreateProject}
+                                    disabled={loadingVideo || !videoFile || !newProjectName || !newProjectDate}
+                                    className="glass-btn-action"
+                                    style={{
+                                        width: '100%',
+                                        padding: '1rem',
+                                        fontSize: '1.05rem',
+                                        marginTop: '8px',
+                                        background: (!videoFile || !newProjectName || !newProjectDate)
+                                            ? 'rgba(96, 165, 250, 0.15)'
+                                            : 'linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(139, 92, 246, 0.4))',
+                                        borderColor: (!videoFile || !newProjectName || !newProjectDate)
+                                            ? 'rgba(147, 197, 253, 0.2)'
+                                            : 'rgba(147, 197, 253, 0.5)'
+                                    }}
+                                >
+                                    {loadingVideo ? '⏳ Processing & Analyzing...' : '🚀 Create Project'}
+                                </button>
+                            </div>
                         </section>
                     </main>
                 </div>
@@ -1167,7 +1285,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                     <input type="text" placeholder="Search..." />
                                 </div>
                                 <div className="user-avatar" style={{ border: 'none' }}>
-                                    <img src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                                    <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
                                 </div>
                                 <button className="dash-logout" onClick={onLogout}>Sign Out</button>
                             </div>
@@ -1214,26 +1332,115 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                             <div className="details-left">
                                 <section className="glass-section" style={{ minHeight: '520px' }}>
                                     <div className="section-header" style={{ marginBottom: '1.5rem' }}>
-                                        <h3 className="animate-head" style={{ fontSize: '1.3rem', fontWeight: 600 }}>Meeting Notes</h3>
-                                        <div style={{ display: 'flex', gap: '12px', opacity: 0.5 }}>
-                                            <span>B</span><span>I</span><span>U</span><span>≡</span><span>🔗</span>
+                                        <h3 className="animate-head" style={{ fontSize: '1.3rem', fontWeight: 600 }}>Meeting Transcript</h3>
+                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                            {!isEditingTranscript ? (
+                                                <button
+                                                    className="glass-btn-secondary"
+                                                    onClick={() => { setIsEditingTranscript(true); setEditedTranscript(notes); setTranscriptSaveMsg(''); }}
+                                                    style={{ padding: '6px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                                >
+                                                    ✏️ Edit Transcript
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        className="glass-btn-action"
+                                                        disabled={savingTranscript}
+                                                        onClick={async () => {
+                                                            setSavingTranscript(true);
+                                                            try {
+                                                                const resp = await fetch('http://localhost:5000/api/transcript/update', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ project_id: activeProject.id, transcript: editedTranscript })
+                                                                });
+                                                                if (resp.ok) {
+                                                                    setNotes(editedTranscript);
+                                                                    setIsEditingTranscript(false);
+                                                                    setTranscriptSaveMsg('✅ Saved!');
+                                                                    setTimeout(() => setTranscriptSaveMsg(''), 3000);
+                                                                } else {
+                                                                    setTranscriptSaveMsg('❌ Save failed');
+                                                                }
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                setTranscriptSaveMsg('❌ Network error');
+                                                            } finally {
+                                                                setSavingTranscript(false);
+                                                            }
+                                                        }}
+                                                        style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                                                    >
+                                                        {savingTranscript ? 'Saving...' : '💾 Save'}
+                                                    </button>
+                                                    <button
+                                                        className="glass-btn-secondary"
+                                                        onClick={() => { setIsEditingTranscript(false); setEditedTranscript(notes); }}
+                                                        style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            )}
+                                            {transcriptSaveMsg && (
+                                                <span style={{ fontSize: '0.8rem', color: transcriptSaveMsg.includes('✅') ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                                                    {transcriptSaveMsg}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                     <div style={{ position: 'relative' }}>
-                                        <textarea
-                                            value={notes}
-                                            onChange={(e) => setNotes(e.target.value)}
-                                            rows="15"
-                                            className="glass-textarea"
-                                            placeholder="Meeting transcript will appear here..."
-                                            style={{
-                                                minHeight: '400px',
-                                                backgroundColor: 'rgba(0,0,0,0.15)',
-                                                border: '1px solid rgba(255,255,255,0.03)',
-                                                padding: '1.5rem',
-                                                fontSize: '0.95rem'
-                                            }}
-                                        />
+                                        {isEditingTranscript ? (
+                                            <textarea
+                                                value={editedTranscript}
+                                                onChange={(e) => setEditedTranscript(e.target.value)}
+                                                rows="15"
+                                                className="glass-textarea"
+                                                placeholder="Edit the meeting transcript..."
+                                                autoFocus
+                                                style={{
+                                                    minHeight: '350px',
+                                                    backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                                                    padding: '1.5rem',
+                                                    fontSize: '0.95rem',
+                                                    lineHeight: '1.8'
+                                                }}
+                                            />
+                                        ) : (
+                                            <div
+                                                className="transcript-viewer"
+                                                style={{
+                                                    minHeight: '350px',
+                                                    maxHeight: '500px',
+                                                    overflowY: 'auto',
+                                                    backgroundColor: 'rgba(0,0,0,0.15)',
+                                                    border: '1px solid rgba(255,255,255,0.03)',
+                                                    padding: '1.5rem',
+                                                    fontSize: '0.95rem',
+                                                    lineHeight: '1.8',
+                                                    color: 'rgba(255,255,255,0.85)',
+                                                    borderRadius: '12px',
+                                                    whiteSpace: 'pre-wrap',
+                                                    fontFamily: "'Inter', sans-serif",
+                                                    cursor: 'text',
+                                                    position: 'relative'
+                                                }}
+                                                onClick={() => { setIsEditingTranscript(true); setEditedTranscript(notes); }}
+                                            >
+                                                {notes || (
+                                                    <span style={{ opacity: 0.4, fontStyle: 'italic' }}>
+                                                        No transcript available. Upload a meeting video or click to type notes...
+                                                    </span>
+                                                )}
+                                                {notes && (
+                                                    <div style={{ position: 'absolute', top: '12px', right: '12px', opacity: 0.3, fontSize: '0.75rem', background: 'rgba(0,0,0,0.3)', padding: '4px 10px', borderRadius: '8px' }}>
+                                                        Click to edit
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         <button
                                             onClick={generateSummary}
                                             disabled={loadingSummary || !notes}
@@ -1250,6 +1457,189 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                         </button>
                                     </div>
                                 </section>
+
+                                {/* Sprint 4: Meeting Images Gallery */}
+                                <section className="glass-section" style={{ marginTop: '0' }}>
+                                    <div className="section-header" style={{ marginBottom: '1.25rem' }}>
+                                        <h3 style={{ fontSize: '1.3rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            📸 Meeting Images
+                                            <span style={{ fontSize: '0.8rem', opacity: 0.5, fontWeight: 400 }}>({meetingImages.length})</span>
+                                        </h3>
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <input
+                                                type="file"
+                                                ref={imageInputRef}
+                                                accept="image/*"
+                                                multiple
+                                                style={{ display: 'none' }}
+                                                onChange={async (e) => {
+                                                    const files = Array.from(e.target.files);
+                                                    if (!files.length || !activeProject?.id) return;
+                                                    setUploadingImage(true);
+                                                    for (const file of files) {
+                                                        const formData = new FormData();
+                                                        formData.append('image', file);
+                                                        formData.append('project_id', activeProject.id);
+                                                        try {
+                                                            const resp = await fetch('http://localhost:5000/api/images/upload', {
+                                                                method: 'POST',
+                                                                body: formData
+                                                            });
+                                                            if (resp.ok) {
+                                                                const data = await resp.json();
+                                                                setMeetingImages(prev => [{ id: data.id, filename: data.filename, mime_type: 'image/png', project_id: activeProject.id }, ...prev]);
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('Image upload error:', err);
+                                                        }
+                                                    }
+                                                    setUploadingImage(false);
+                                                    e.target.value = '';
+                                                }}
+                                            />
+                                            <button
+                                                className="glass-btn-action"
+                                                onClick={() => imageInputRef.current?.click()}
+                                                disabled={uploadingImage}
+                                                style={{ padding: '6px 16px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                {uploadingImage ? 'Uploading...' : '📎 Upload Images'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {meetingImages.length > 0 ? (
+                                        <div className="meeting-image-grid" style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                            gap: '12px',
+                                            padding: '0.5rem 0'
+                                        }}>
+                                            {meetingImages.map(img => (
+                                                <div key={img.id} className="meeting-image-card" style={{
+                                                    position: 'relative',
+                                                    borderRadius: '12px',
+                                                    overflow: 'hidden',
+                                                    border: '1px solid rgba(255,255,255,0.06)',
+                                                    aspectRatio: '1',
+                                                    cursor: 'pointer',
+                                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                                    background: 'rgba(0,0,0,0.2)'
+                                                }}
+                                                    onClick={() => setLightboxImage(img)}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.03)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(59,130,246,0.2)'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                                >
+                                                    <img
+                                                        src={`http://localhost:5000/api/images/${img.id}`}
+                                                        alt={img.filename}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        loading="lazy"
+                                                    />
+                                                    <div style={{
+                                                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                                                        padding: '8px',
+                                                        background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
+                                                        fontSize: '0.7rem',
+                                                        color: 'rgba(255,255,255,0.8)',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }}>
+                                                        {img.filename}
+                                                    </div>
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!window.confirm(`Delete ${img.filename}?`)) return;
+                                                            try {
+                                                                await fetch('http://localhost:5000/api/images/delete', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ image_id: img.id })
+                                                                });
+                                                                setMeetingImages(prev => prev.filter(i => i.id !== img.id));
+                                                            } catch (err) { console.error(err); }
+                                                        }}
+                                                        style={{
+                                                            position: 'absolute', top: '6px', right: '6px',
+                                                            background: 'rgba(239, 68, 68, 0.8)',
+                                                            border: 'none', color: '#fff',
+                                                            width: '22px', height: '22px',
+                                                            borderRadius: '50%', cursor: 'pointer',
+                                                            fontSize: '0.7rem',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            opacity: 0, transition: 'opacity 0.2s'
+                                                        }}
+                                                        className="img-delete-btn"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            textAlign: 'center',
+                                            padding: '2.5rem 1rem',
+                                            opacity: 0.4,
+                                            border: '2px dashed rgba(255,255,255,0.08)',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer'
+                                        }}
+                                            onClick={() => imageInputRef.current?.click()}
+                                        >
+                                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🖼️</div>
+                                            <div>Click to upload meeting images, screenshots, or whiteboard photos</div>
+                                        </div>
+                                    )}
+                                </section>
+
+                                {/* Lightbox Modal */}
+                                {lightboxImage && (
+                                    <div style={{
+                                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                                        background: 'rgba(0,0,0,0.85)',
+                                        backdropFilter: 'blur(20px)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        zIndex: 9999,
+                                        cursor: 'pointer'
+                                    }}
+                                        onClick={() => setLightboxImage(null)}
+                                    >
+                                        <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+                                            <img
+                                                src={`http://localhost:5000/api/images/${lightboxImage.id}`}
+                                                alt={lightboxImage.filename}
+                                                style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+                                            />
+                                            <div style={{
+                                                textAlign: 'center',
+                                                marginTop: '12px',
+                                                color: 'rgba(255,255,255,0.7)',
+                                                fontSize: '0.9rem'
+                                            }}>
+                                                {lightboxImage.filename}
+                                            </div>
+                                            <button
+                                                onClick={() => setLightboxImage(null)}
+                                                style={{
+                                                    position: 'absolute', top: '-12px', right: '-12px',
+                                                    background: 'rgba(255,255,255,0.15)',
+                                                    border: '1px solid rgba(255,255,255,0.2)',
+                                                    color: '#fff',
+                                                    width: '36px', height: '36px',
+                                                    borderRadius: '50%', cursor: 'pointer',
+                                                    fontSize: '1rem',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    backdropFilter: 'blur(10px)'
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <section className="glass-section" style={{ minHeight: '450px', background: 'rgba(30, 41, 59, 0.15)' }}>
                                     <div className="section-header">
@@ -1457,14 +1847,28 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                                                                 {editingTaskId === (t.id || `task-${i}`) ? (
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                                        <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Task Description</label>
-                                                                        <input 
-                                                                            className="glass-text-input"
-                                                                            value={editTaskTitle}
-                                                                            onChange={(e) => setEditTaskTitle(e.target.value)}
-                                                                            style={{ padding: '8px', fontSize: '1rem', width: '90%' }}
-                                                                            placeholder="What needs to be done?"
-                                                                        />
+                                                                        <div style={{ display: 'flex', gap: '15px' }}>
+                                                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                                <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Task Description</label>
+                                                                                <input 
+                                                                                    className="glass-text-input"
+                                                                                    value={editTaskTitle}
+                                                                                    onChange={(e) => setEditTaskTitle(e.target.value)}
+                                                                                    style={{ padding: '8px', fontSize: '1rem', width: '100%' }}
+                                                                                    placeholder="What needs to be done?"
+                                                                                />
+                                                                            </div>
+                                                                            <div style={{ width: '200px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                                <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Due Date</label>
+                                                                                <input 
+                                                                                    type="date"
+                                                                                    className="glass-text-input"
+                                                                                    value={editTaskDueDate}
+                                                                                    onChange={(e) => setEditTaskDueDate(e.target.value)}
+                                                                                    style={{ padding: '8px', fontSize: '1rem', width: '100%', height: '40px' }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
                                                                         
                                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                                                             <label style={{ fontSize: '0.75rem', opacity: 0.5 }}>Assign To</label>
@@ -1509,7 +1913,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                                                             <div style={{ display: 'flex', gap: '10px' }}>
                                                                                 <button 
                                                                                     className="glass-btn-action" 
-                                                                                    onClick={() => handleUpdateTaskWithAutoMember(i, editTaskOwner, editTaskTitle)}
+                                                                                    onClick={() => handleUpdateTaskWithAutoMember(i, editTaskOwner, editTaskTitle, editTaskDueDate)}
                                                                                     style={{ padding: '6px 16px', fontSize: '0.85rem' }}
                                                                                 >
                                                                                     Save Changes
@@ -1539,6 +1943,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                                                                     setEditingTaskId(t.id || `task-${i}`);
                                                                                     setEditTaskTitle(t.title);
                                                                                     setEditTaskOwner(t.owner_id || '');
+                                                                                    setEditTaskDueDate(t.due_date ? t.due_date.substring(0, 10) : '');
                                                                                 }}
                                                                                 style={{ 
                                                                                     background: 'rgba(59, 130, 246, 0.1)', 
@@ -1639,7 +2044,7 @@ function Dashboard({ user, onLogout, theme, setTheme }) {
                                 <input type="text" placeholder="Search..." />
                             </div>
                             <div className="user-avatar" style={{ border: 'none' }}>
-                                <img src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.email || 'User')}&background=random`} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
                             </div>
                             <button className="dash-logout" onClick={onLogout}>Sign Out</button>
                         </div>

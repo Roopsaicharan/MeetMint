@@ -2,7 +2,7 @@
   --primary-blue: #3b82f6;
   --secondary-blue: #1d4ed8;
   --background-dark: #0f172a;
-  --text-light: #f8fafc; 
+  --text-light: #f8fafc;
   --glass-bg: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.2);
 
@@ -83,42 +83,21 @@ body {
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  cursor: none;
+  cursor: auto;
 }
 
 /* Hide default cursor everywhere */
 body {
-  cursor: none;
+  cursor: auto;
 }
 
 /* ========== Custom Cursor System (Standardized) ========== */
 #dot {
-  position: fixed;
-  width: 12px;
-  height: 12px;
-  background: var(--accent) !important;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 999999;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 20px var(--accent);
-  transition: width .2s, height .2s, background .2s;
+  display: none !important;
 }
 
 #ring {
-  position: fixed;
-  width: 48px;
-  height: 48px;
-  border: 1.5px solid var(--accent);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 999998;
-  transform: translate(-50%, -50%);
-  opacity: 0.45;
-  box-shadow: 0 0 8px var(--accent-glow);
-  transition: width .3s cubic-bezier(.25, .8, .25, 1),
-    height .3s cubic-bezier(.25, .8, .25, 1),
-    border-color .3s;
+  display: none !important;
 }
 
 /* Force higher visibility for Blue Theme specifically */
@@ -329,7 +308,7 @@ body[data-theme='blue'] #ring {
   transform-style: preserve-3d;
   position: relative;
   overflow: hidden;
-  cursor: none;
+  cursor: auto;
   /* Default state is visible and flat */
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -341,8 +320,12 @@ body[data-theme='blue'] #ring {
 }
 
 .ultra-card:hover {
-  border-color: rgba(59, 130, 246, 0.38);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(59, 130, 246, 0.09);
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(59, 130, 246, 0.15),
+              0 0 80px rgba(139, 92, 246, 0.1);
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(30, 41, 59, 0.45);
 }
 
 .ultra-card.off-stage {
@@ -721,10 +704,12 @@ body[data-theme='blue'] #ring {
 }
 
 .project-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  background: rgba(15, 23, 42, 0.5);
-  border-color: rgba(96, 165, 250, 0.5);
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(59, 130, 246, 0.15),
+              0 0 80px rgba(139, 92, 246, 0.1);
+  background: rgba(30, 41, 59, 0.45);
+  border-color: rgba(96, 165, 250, 0.4);
 }
 
 /* Section Header Layout */
@@ -844,6 +829,7 @@ body[data-theme='blue'] #ring {
 
 .glass-text-input {
   flex: 1;
+  width: 100%;
   padding: 0.75rem 1rem;
   background: rgba(26, 54, 93, 0.5);
   backdrop-filter: blur(15px) saturate(150%);
@@ -855,6 +841,7 @@ body[data-theme='blue'] #ring {
   font-family: inherit;
   transition: all 0.3s ease;
   outline: none;
+  box-sizing: border-box;
 }
 
 .glass-text-input::placeholder {
@@ -865,6 +852,20 @@ body[data-theme='blue'] #ring {
   background: rgba(26, 54, 93, 0.7);
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+.dash-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.dash-input-group .glass-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
 }
 
 .dash-input-row {
@@ -1752,7 +1753,7 @@ body[data-theme='red'] .ultra-clear-logo-text {
   font-weight: 700;
   letter-spacing: -.3px;
   color: #fff;
-  cursor: none;
+  cursor: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .4);
 }
 
@@ -1885,7 +1886,7 @@ body[data-theme='red'] .ultra-clear-logo-text {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: none;
+  cursor: auto;
   transition: all .22s ease;
   flex-shrink: 0;
   margin-left: 4px;
@@ -1953,7 +1954,7 @@ body[data-theme='red'] .ultra-clear-logo-text {
   border: none;
   color: rgba(220, 200, 160, .35);
   font-size: .8rem;
-  cursor: none;
+  cursor: auto;
   transition: color .2s;
   padding: 0;
   line-height: 1;
@@ -2050,7 +2051,7 @@ body[data-theme='red'] .ultra-clear-logo-text {
   font-size: .68rem;
   font-weight: 700;
   font-family: inherit;
-  cursor: none;
+  cursor: auto;
   transition: all .2s;
   white-space: nowrap;
   flex-shrink: 0;
@@ -2164,3 +2165,239 @@ body[data-theme='red'] .ultra-clear-logo-text {
 .amp-item:hover {
   background: rgba(255, 255, 255, 0.03);
 }
+
+/* ========== Sprint 4: Premium Date Picker / Calendar ========== */
+
+/* Base date input styling */
+input[type="date"].glass-text-input {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  color-scheme: dark;
+}
+
+input[type="date"].glass-text-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(5) hue-rotate(195deg);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+input[type="date"].glass-text-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Chrome/Edge date picker popup styling */
+::-webkit-datetime-edit {
+  font-family: 'Inter', 'Outfit', sans-serif;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
+}
+
+::-webkit-datetime-edit-fields-wrapper {
+  padding: 2px;
+}
+
+::-webkit-datetime-edit-text {
+  color: rgba(147, 197, 253, 0.5);
+  padding: 0 3px;
+}
+
+::-webkit-datetime-edit-month-field,
+::-webkit-datetime-edit-day-field,
+::-webkit-datetime-edit-year-field {
+  color: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+::-webkit-datetime-edit-month-field:focus,
+::-webkit-datetime-edit-day-field:focus,
+::-webkit-datetime-edit-year-field:focus {
+  background: var(--accent-dim);
+  color: var(--accent-lt);
+  outline: none;
+}
+
+/* Native calendar popup (Chromium) */
+::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+/* Style the actual calendar popup via color-scheme */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+/* Enhanced date input wrapper styling */
+.dash-input-group input[type="date"] {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border: 2px solid var(--accent-rim) !important;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dash-input-group input[type="date"]:hover {
+  border-color: var(--accent) !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.1),
+              0 0 0 1px rgba(59, 130, 246, 0.1),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dash-input-group input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  box-shadow: 0 0 0 3px var(--accent-dim),
+              0 4px 20px rgba(59, 130, 246, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Calendar label styling enhancement */
+.dash-input-group .glass-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ========== Sprint 4: Meeting Image Gallery ========== */
+
+.meeting-image-card:hover .img-delete-btn {
+  opacity: 1 !important;
+}
+
+.meeting-image-card img {
+  transition: transform 0.3s ease;
+}
+
+.meeting-image-card:hover img {
+  transform: scale(1.05);
+}
+
+/* ========== Sprint 4: Transcript Viewer ========== */
+
+.transcript-viewer {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(96, 165, 250, 0.3) transparent;
+}
+
+.transcript-viewer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.transcript-viewer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.transcript-viewer::-webkit-scrollbar-thumb {
+  background: rgba(96, 165, 250, 0.3);
+  border-radius: 10px;
+}
+
+.transcript-viewer::-webkit-scrollbar-thumb:hover {
+  background: rgba(96, 165, 250, 0.5);
+}
+
+.transcript-viewer:hover {
+  border-color: rgba(59, 130, 246, 0.15) !important;
+  background-color: rgba(0, 0, 0, 0.18) !important;
+  transition: all 0.3s ease;
+}
+
+/* ========== UI Enhancements & Hover Effects ========== */
+
+/* Enhanced Create Project Card */
+.create-project-card {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Bouncy hover */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+.create-project-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  transition: box-shadow 0.4s ease;
+}
+
+.create-project-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 
+              0 0 40px rgba(59, 130, 246, 0.15),
+              0 0 80px rgba(139, 92, 246, 0.1);
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.create-project-card:hover::before {
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.3);
+}
+
+/* Enhancing standard glass inputs to feel premium */
+.glass-text-input {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.glass-text-input:hover {
+  background: rgba(30, 58, 100, 0.6);
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Button Glow on Hover */
+.glass-btn-action {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-btn-action::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.3s ease, transform 0.5s ease;
+  pointer-events: none;
+}
+
+.glass-btn-action:hover::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Form Section Header Enhancement */
+.create-project-card .section-header h3 {
+  background: linear-gradient(135deg, #fff 0%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+

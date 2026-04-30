@@ -51,10 +51,10 @@ type GeminiEmbedResponse struct {
 
 func GetGeminiEmbedding(text string) ([]float32, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + apiKey
+	url := "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 
 	reqBody := GeminiEmbedRequest{}
-	reqBody.Model = "models/gemini-embedding-001"
+	reqBody.Model = "models/text-embedding-004"
 	reqBody.Content.Parts = []struct {
 		Text string `json:"text"`
 	}{
@@ -62,8 +62,15 @@ func GetGeminiEmbedding(text string) ([]float32, error) {
 	}
 	jsonData, _ := json.Marshal(reqBody)
 
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("Gemini Embed API failed: %w", err)
 	}
@@ -95,7 +102,7 @@ func CosineSimilarity(a, b []float32) float32 {
 // -- Step 4: Call Gemini For Answers --
 func CallGeminiRAG(prompt string) (string, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=" + apiKey
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 	reqBody := map[string]interface{}{
 		"contents": []interface{}{
@@ -113,8 +120,15 @@ func CallGeminiRAG(prompt string) (string, error) {
 	}
 	jsonData, _ := json.Marshal(reqBody)
 
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("Gemini AI failed: %w", err)
 	}

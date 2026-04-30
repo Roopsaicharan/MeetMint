@@ -115,13 +115,18 @@ TRANSCRIPT:
 	}
 
 	// ── Call Gemini API ───────────────────────────────────────────────────
-	log.Printf("Calling Gemini API with model gemini-3-flash-preview... (Key prefix: %s)", keyPrefix)
-	url := fmt.Sprintf(
-		"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=%s",
-		apiKey,
-	)
+	log.Printf("Calling Gemini API with model gemini-1.5-flash... (Key prefix: %s)", keyPrefix)
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return MeetingAnalysis{}, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("❌ Gemini API call error: %v", err)
 		return MeetingAnalysis{}, fmt.Errorf("gemini API call failed: %w", err)
@@ -196,8 +201,16 @@ USER QUESTION:
 		return "", err
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=%s", apiKey)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(bodyBytes))
+	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}

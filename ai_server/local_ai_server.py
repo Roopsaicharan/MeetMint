@@ -32,7 +32,7 @@ def transcribe():
         
         # 1. Use MoviePy to safely extract a WAV file
         wav_path = temp_path + ".wav"
-        clip = VideoFileClip(temp_path) 
+        clip = VideoFileClip(temp_path)
         
         if clip.audio is None:
             clip.close()

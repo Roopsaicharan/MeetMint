@@ -471,3 +471,57 @@ func TestHandler_Summary_Fallback(t *testing.T) {
 		t.Errorf("Summary fallback: expected 200, got %d", rr.Code)
 	}
 }
+
+func TestHandler_UpdateTaskDetail(t *testing.T) {
+	resetDB()
+	router := SetupRouter()
+	pid, _ := InsertProject("Update Task Proj", nil, "")
+	mid, _ := InsertMeeting(&pid, "t", "s")
+	tid, _ := InsertTask(&mid, &pid, "Old Title", "Old Desc", nil, "Old Owner", nil, nil)
+
+	dueDate := "2026-12-31"
+	body, _ := json.Marshal(UpdateTaskDetailRequest{
+		TaskID:  tid,
+		Title:   "New Task Title",
+		DueDate: &dueDate,
+	})
+	req := httptest.NewRequest("POST", "/api/tasks/edit", bytes.NewBuffer(body))
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("UpdateTaskDetail: expected 200, got %d — %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify update in DB
+	tasks, _ := GetTasksByProject(pid)
+	if len(tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].Title != "New Task Title" {
+		t.Errorf("Expected title 'New Task Title', got %q", tasks[0].Title)
+	}
+	if tasks[0].DueDate != dueDate {
+		t.Errorf("Expected due date %q, got %q", dueDate, tasks[0].DueDate)
+	}
+}
+
+func TestHandler_UploadImage(t *testing.T) {
+	resetDB()
+	pid, _ := InsertProject("Image Proj", nil, "")
+	mid, _ := InsertMeeting(&pid, "t", "s")
+
+	// Test the database storage part of the image feature
+	imageID, err := InsertMeetingImage(mid, pid, "test.png", "image/png", []byte("fake-image-data"))
+	if err != nil {
+		t.Fatalf("InsertMeetingImage failed: %v", err)
+	}
+	if len(imageID) != 36 {
+		t.Errorf("Expected UUID for image, got %q", imageID)
+	}
+
+	images, err := GetMeetingImagesByProject(pid)
+	if err != nil || len(images) != 1 {
+		t.Errorf("Expected 1 image in project, got %d", len(images))
+	}
+}

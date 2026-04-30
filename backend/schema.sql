@@ -153,3 +153,16 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
   started_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
   completed_at   DATETIME
 );
+
+-- =============================================================
+-- 13) meeting_images
+-- =============================================================
+CREATE TABLE IF NOT EXISTS meeting_images (
+    id         TEXT PRIMARY KEY,
+    meeting_id TEXT REFERENCES meetings(id) ON DELETE CASCADE,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    filename   TEXT NOT NULL,
+    data       BLOB NOT NULL,
+    mime_type  TEXT DEFAULT 'image/png',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
